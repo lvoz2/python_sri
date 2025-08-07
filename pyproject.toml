@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py_sri"
+version = "0.1.0"
+authors = [
+  { name="lv_oz2", email="lv_oz2@icloud.com" },
+]
+description = "Generate SRI hashes on the fly for your Python Web App"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Homepage = "https://github.com/lvoz2/py-sri"
+Issues = "https://github.com/lvoz2/py-sri/issues"
