@@ -11,7 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }} with PyEnv
-      run: pyenv install ${{ matrix.python-version }}
+      run: pyenv install -s ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
         pyenv shell ${{ matrix.python-version }}
