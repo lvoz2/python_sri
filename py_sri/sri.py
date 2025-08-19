@@ -328,7 +328,9 @@ class SRI:
                 res = self.hash_data(file.read())
         else:
             alg = self.__hash_alg
-            f_digest = hashlib.file_digest(file, alg)  # type: ignore[attr-defined]
+            f_digest = hashlib.file_digest(  # type: ignore[attr-defined, unused-ignore]
+                file, alg
+            )
             digest: bytes = f_digest.digest()
             b64: str = base64.b64encode(digest).decode(encoding="ascii")
             res = f"{self.__hash_alg}-{b64}"
