@@ -10,6 +10,7 @@ import hashlib
 import io
 import pathlib
 import re
+import sys
 from typing import Any, Callable, Literal, Optional, cast
 from urllib import parse as url_parse
 
@@ -321,11 +322,19 @@ class SRI:
         """
         if clear is None:
             clear = self.__in_dev
-        digest: bytes = hashlib.file_digest(file, self.__hash_alg).digest()
-        b64: str = base64.b64encode(digest).decode(encoding="ascii")
+        if sys.version_info.minor < 11:
+            # hashlib.file_digest was added in Python 3.11
+            with file:
+                res = self.hash_data(file.read())
+        else:
+            alg = self.__hash_alg
+            f_digest = hashlib.file_digest(file, alg)  # type: ignore[attr-defined]
+            digest: bytes = f_digest.digest()
+            b64: str = base64.b64encode(digest).decode(encoding="ascii")
+            res = f"{self.__hash_alg}-{b64}"
         if clear:
             self.clear_cache()
-        return f"{self.__hash_alg}-{b64}"
+        return res
 
     @functools.lru_cache(maxsize=64)
     def hash_url(
