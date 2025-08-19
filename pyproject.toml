@@ -21,3 +21,6 @@ license-files = ["LICEN[CS]E*"]
 [project.urls]
 Homepage = "https://github.com/lvoz2/py-sri"
 Issues = "https://github.com/lvoz2/py-sri/issues"
+
+[tool.pytest.ini_options]
+addopts = "--cov=py_sri --cov-report term-missing:skip-covered"
