@@ -1,4 +1,4 @@
-"""Entry point to py_sri"""
+"""Entry point to python_sri"""
 
 from .sri import SRI
 

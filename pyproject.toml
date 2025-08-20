@@ -1,26 +1,39 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "py_sri"
+name = "python_sri"
 version = "0.1.0"
 authors = [
   { name="lv_oz2", email="lv_oz2@icloud.com" },
 ]
-description = "Generate SRI hashes on the fly for your Python Web App"
+description = "Generate SRI hashes on the fly for some HTML, files, URL or data"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
-    "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: Free Threading",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Internet :: WWW/HTTP :: Site Management",
+    "Topic :: Security",
+    "Topic :: Security :: Cryptography",
+    "Typing :: Typed",
 ]
 license = "MIT"
-license-files = ["LICEN[CS]E*"]
+license-files = ["LICENSE*"]
+keywords = ["sri", "subresource integrity"]
 
 [project.urls]
-Homepage = "https://github.com/lvoz2/py-sri"
-Issues = "https://github.com/lvoz2/py-sri/issues"
+Homepage = "https://github.com/lvoz2/python_sri"
+Issues = "https://github.com/lvoz2/python_sri/issues"
+Documentation = "https://github.com/lvoz2/python_sri?tab=readme-ov-file#usage"
 
 [tool.pytest.ini_options]
-addopts = "--cov=py_sri --cov-report term-missing:skip-covered"
+addopts = "--cov=python_sri --cov-report term-missing:skip-covered"

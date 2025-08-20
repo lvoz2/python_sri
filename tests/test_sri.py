@@ -7,7 +7,7 @@ import random
 
 import pytest
 
-from py_sri import SRI
+from python_sri import SRI
 
 test_domain = "http://127.0.0.1"
 css_sri = "sha256-dO7jYfk102fOhrUJM3ihI4I9y7drqDrJgzyrHgX1ChA="

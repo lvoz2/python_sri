@@ -4,7 +4,7 @@ import pathlib
 import random
 import string
 
-from py_sri import SRI
+from python_sri import SRI
 
 test_domain = "http://127.0.0.1"
 css_sri = "sha256-dO7jYfk102fOhrUJM3ihI4I9y7drqDrJgzyrHgX1ChA="
@@ -151,7 +151,7 @@ def test_absolute() -> None:
     )
     test_html = (
         '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist'
-        + '/css/bootstrap.min.css" data-sri-error="py-sri does not currently support '
+        + '/css/bootstrap.min.css" data-sri-error="python_sri does not currently support '
         + "the addition of SRI hashes to absolute URLs. If this resource is owned by "
         + 'the website, use a relative URL instead for SRI hashes">'
     )
