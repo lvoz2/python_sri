@@ -30,8 +30,8 @@ jobs:
         [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
         eval "$(pyenv init - bash)"
         pyenv shell ${{ matrix.python-version }}
-        mypy --strict py_sri/ tests/
-        pylint py_sri/ tests/
+        mypy --strict python_sri/ tests/
+        pylint python_sri/ tests/
     - name: Test code with Pytest
       run: |
         export PYENV_ROOT="$HOME/.pyenv"
