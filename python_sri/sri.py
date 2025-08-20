@@ -233,8 +233,8 @@ class SRI:
                 # is not hashed on page load, which would defeat the purpose of SRI
                 del tag["integrity"]
                 tag["data-sri-error"] = (
-                    "python_sri does not currently support the addition of SRI hashes to "
-                    + "absolute URLs. If this resource is owned by the website, use "
+                    "python_sri does not currently support the addition of SRI hashes "
+                    + "to absolute URLs. If this resource is owned by the website, use "
                     + "a relative URL instead for SRI hashes"
                 )
                 continue

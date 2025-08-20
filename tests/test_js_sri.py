@@ -147,9 +147,9 @@ def test_absolute() -> None:
     )
     test_html = (
         '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.'
-        + 'min.css" data-sri-error="python_sri does not currently support the addition of '
-        + "SRI hashes to absolute URLs. If this resource is owned by the website, use "
-        + 'a relative URL instead for SRI hashes">'
+        + 'min.css" data-sri-error="python_sri does not currently support the addition '
+        + "of SRI hashes to absolute URLs. If this resource is owned by the website, "
+        + 'use a relative URL instead for SRI hashes">'
     )
     out_html = run_sri(pwd / "static", "/", "sha256", in_html, "/index.html")
     assert out_html == test_html
