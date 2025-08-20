@@ -104,7 +104,7 @@ clear: Whether to run py_sri.SRI.clear_cache() after finishing. By default, this
 #### py_sri.SRI.hash_data(*data*) -> str
 Creates a SRI hash for the data in ```data```
 
-data: A bytes-like object containing the data to hash
+data: A bytes-like object containing the data to hash. If attempting to give a string or textual data that is not already bytes-like, use methods like [```str.encode```](https://docs.python.org/3/library/stdtypes.html#str.encode)
 
 ## Contributing
 
