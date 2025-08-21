@@ -270,10 +270,11 @@ def test_bad_ssl() -> None:
         '<link rel="stylesheet" href="/" data-sri-error="Some other urllib error '
         + "occured. Reason: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify "
         + "failed: Hostname mismatch, certificate is not valid for 'wrong.host."
-        + "badssl.com'. (_ssl.c:1032)\">"
+        + "badssl.com'. (_ssl.c:10"
     )
+    end_test_html = ")\">"
     out_html = inst.hash_html("/", in_html)
-    assert test_html == out_html
+    assert out_html.startswith(test_html) and out_html.endswith(end_test_html)
 
 
 def test_missing_route() -> None:

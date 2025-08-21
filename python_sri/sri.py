@@ -353,7 +353,7 @@ class SRI:
                 res = self.hash_data(file.read())
         else:
             alg = self.__hash_alg
-            f_digest = hashlib.file_digest(  # type: ignore[attr-defined, unused-ignore]
+            f_digest = hashlib.file_digest(  # type: ignore[attr-defined, unused-ignore] pylint: disable=no-member, line-too-long
                 file, alg
             )
             digest: bytes = f_digest.digest()
