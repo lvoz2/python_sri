@@ -4,12 +4,15 @@
 
 import pathlib
 import random
+import time
+from typing import Any
+from urllib import request
 
 import pytest
 
 from python_sri import SRI
 
-test_domain = "http://127.0.0.1"
+test_domain = "https://lvoz2.github.io/"
 css_sri = "sha256-dO7jYfk102fOhrUJM3ihI4I9y7drqDrJgzyrHgX1ChA="
 js_sri = "sha256-rucZS1gOWuZjatfQlHrI22U0hXgbUKCCyH1W5+tUQh4="
 pwd = pathlib.Path("tests") if pathlib.Path("tests").exists() else pathlib.Path(".")
@@ -71,12 +74,22 @@ def test_get_in_dev() -> None:
     assert all((true, false)) is True
 
 
-def test_full_file() -> None:
+def test_full_file_using_static() -> None:
     with open(pwd / "static" / "index.html", "r", encoding="utf-8") as f:
         in_html = f.read()
     with open(pwd / "sri_output" / "index.html", "r", encoding="utf-8") as f:
         test_html = f.read().strip()
     out_html = run_sri(pwd / "static", "/static", "sha384", in_html, "/index.html")
+    assert out_html == test_html
+
+
+def test_full_file_using_http() -> None:
+    with open(pwd / "static" / "index.html", "r", encoding="utf-8") as f:
+        in_html = f.read()
+    with open(pwd / "sri_output" / "http.html", "r", encoding="utf-8") as f:
+        test_html = f.read().strip()
+    sri = SRI(test_domain)
+    out_html = sri.hash_html("/", in_html)
     assert out_html == test_html
 
 
@@ -169,16 +182,13 @@ def test_file_path_str() -> None:
 def test_file_path_str_404() -> None:
     path = str(pwd / "static" / "js" / "main.js")
     inst = SRI(test_domain, hash_alg="sha256")
-    assert inst.hash_file_path(path) == "File not found"
+    with pytest.raises(ValueError, match=f"File not found at path {path}"):
+        inst.hash_file_path(path)
 
 
 def test_http() -> None:
     inst = SRI(test_domain, hash_alg="sha256")
-    assert (
-        inst.hash_url("/static/js/test.js")
-        == "Currently, only file hashing is supported, but soon URL hashing will be "
-        + "implemented"
-    )
+    assert inst.hash_url("/static/js/test.js", route="/") == js_sri
 
 
 def test_hash_data() -> None:
@@ -223,15 +233,65 @@ def test_clear_file_object() -> None:
 
 def test_clear_url() -> None:
     inst = SRI(test_domain, hash_alg="sha256")
-    assert (
-        inst.hash_url("/static/js/test.js", clear=True)
-        == "Currently, only file hashing is supported, but soon URL hashing will be "
-        + "implemented"
-    )
+    assert inst.hash_url("/static/js/test.js", route="/", clear=True) == js_sri
 
 
 def test_processing_instruction() -> None:
     in_html = "<div><?proc color='red'></div>"
     test_html = "<div><?proc color='red'></div>"
     out_html = run_sri(pwd / "static", "/", "sha384", in_html, "/")
+    assert test_html == out_html
+
+
+def test_not_https() -> None:
+    in_html = '<link rel="stylesheet" href="/" integrity></link>'
+    inst = SRI("http://neverssl.com/")
+    with pytest.raises(ValueError, match="URL scheme/protocol must be HTTPS"):
+        inst.hash_html("/", in_html)
+
+
+def test_url_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    def mock_urlopen(*args: Any, **kwargs: Any) -> None:  # pylint: disable=W0613
+        time.sleep(0.25)
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(request, "urlopen", mock_urlopen)
+    inst = SRI(test_domain)
+    in_html = '<link rel="stylesheet" href="/" integrity></link>'
+    test_html = '<link rel="stylesheet" href="/" data-sri-error="Timeout exceeded">'
+    out_html = inst.hash_html("/", in_html)
+    assert test_html == out_html
+
+
+def test_bad_ssl() -> None:
+    inst = SRI("https://wrong.host.badssl.com/")
+    in_html = '<link rel="stylesheet" href="/" integrity></link>'
+    test_html = (
+        '<link rel="stylesheet" href="/" data-sri-error="Some other urllib error '
+        + "occured. Reason: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify "
+        + "failed: Hostname mismatch, certificate is not valid for 'wrong.host."
+        + "badssl.com'. (_ssl.c:1032)\">"
+    )
+    out_html = inst.hash_html("/", in_html)
+    assert test_html == out_html
+
+
+def test_missing_route() -> None:
+    inst = SRI("https://example.com/")
+    with pytest.raises(
+        TypeError,
+        match="Relative paths must include the route being used so that an absolute "
+        + "URL can be constructed",
+    ):
+        inst.hash_url("/")
+
+
+def test_bad_content_type() -> None:
+    inst = SRI("https://lvoz2.github.io/python_sri/")
+    in_html = '<link rel="stylesheet" href="/" integrity></link>'
+    test_html = (
+        '<link rel="stylesheet" href="/" data-sri-error="URL linked to in href/src '
+        + 'attribute had an invalid Content-Type">'
+    )
+    out_html = inst.hash_html("/", in_html)
     assert test_html == out_html

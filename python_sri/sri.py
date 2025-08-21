@@ -10,9 +10,13 @@ import hashlib
 import io
 import pathlib
 import re
+import socket
+import ssl
 import sys
 from typing import Any, Callable, Literal, Optional, cast
+from urllib import error as url_error
 from urllib import parse as url_parse
+from urllib import request as url_request
 
 from . import parser
 
@@ -253,25 +257,47 @@ class SRI:
                     )
                     continue
                 fs_path: pathlib.Path = self.__static_dir / pathlib.Path(new_path)
-                hash_str = self.hash_file_path(fs_path, False)
+                try:
+                    hash_str = self.hash_file_path(fs_path, False)
+                except ValueError:
+                    del tag["integrity"]
+                    tag["data-sri-error"] = "File not found"
+                    continue
             else:
                 # Fetch via HTTP GET request
-                pass
-            if hash_str == "":
-                # Unknown error or no message passed up
-                del tag["integrity"]
-                tag["data-sri-error"] = (
-                    "An unknown error occured, or no static configuration found"
-                )
-                continue
-            elif len(hash_str) >= 3 and hash_str[:3] == "sha":
-                # Valid hash
-                tag["integrity"] = hash_str
-            else:
-                # Hash function has errored, message is in hash_str
-                del tag["integrity"]
-                tag["data-sri-error"] = hash_str
-                continue
+                try:
+                    hash_str = self.hash_url(as_absolute_url)
+                except ValueError as err:
+                    if not str(err).startswith(
+                        "Requested resource did not serve a Content-Type of text/"
+                        + "javascript or text/css."
+                    ):
+                        raise err
+                    del tag["integrity"]
+                    tag["data-sri-error"] = (
+                        "URL linked to in href/src attribute had an invalid "
+                        + "Content-Type"
+                    )
+                    continue
+                except url_error.HTTPError as err:
+                    del tag["integrity"]
+                    tag["data-sri-error"] = (
+                        f"HTTP GET Failed. Status Code: {err.status}. Reason: "
+                        + err.reason
+                    )
+                    continue
+                except url_error.URLError as err:
+                    del tag["integrity"]
+                    tag["data-sri-error"] = (
+                        f"Some other urllib error occured. Reason: {err.reason}"
+                    )
+                    continue
+                except TimeoutError as err:
+                    del tag["integrity"]
+                    tag["data-sri-error"] = "Timeout exceeded"
+                    continue
+            # Should be valid hash in hash_str
+            tag["integrity"] = hash_str
         if clear:
             self.clear_cache()
         return self.__parser.stringify()
@@ -293,7 +319,7 @@ class SRI:
             clear = self.__in_dev
         if isinstance(path, pathlib.Path):
             if not path.is_file():
-                return "File not found"
+                raise ValueError(f"File not found at path {path}")
             with open(path, "rb") as f:
                 if clear:
                     self.clear_cache()
@@ -301,7 +327,7 @@ class SRI:
         elif isinstance(path, str) and url_parse.urlparse(path).netloc == "":
             path_inst = pathlib.Path(path)
             if not path_inst.is_file():
-                return "File not found"
+                raise ValueError(f"File not found at path {path}")
             with open(path_inst, "rb") as f:
                 if clear:
                     self.clear_cache()
@@ -340,30 +366,83 @@ class SRI:
 
     @functools.lru_cache(maxsize=64)
     def hash_url(
-        self,  # pylint: disable=W0613
-        url: str,  # pylint: disable=W0613
-        *args: Any,
+        self,
+        url: str,
+        *,
+        timeout: Optional[float] = None,
+        headers: Optional[dict[str, str]] = None,
+        context: Optional[ssl.SSLContext] = None,
+        route: Optional[str] = None,
         clear: Optional[bool] = None,
-        **kwargs: Any,
     ) -> str:
-        """Hashes the content of a url (NOT IMPLEMENTED YET)
+        """Hashes the content of a URL
 
         url: The URL
+        Keyword Arguments:
+        timeout: How long to wait for a response from the server, in seconds. Can be set
+            via socket.setdefaulttimeout(timeout)
+        headers: A dictionary of HTTP request headers to send. Defaults to "{}"
+        context: A ssl.SSLContext describing information relevant to creating a secure
+            session using SSL/TLS. Defaults to whatever ssl.create_default_context()
+            returns
+        route: The route to whatever document is initiating the call. This could be
+            "/index.html" etc. Required if the URL is not an absolute URL
         clear: Whether to clear the cache after running. Defaults to the value of in_dev
             Use the in_dev property to control automatic clearing for freshness
-        Extra arguments are given to urllib.request.urlopen()
 
         returns: The SRI hash (eg sha256-HASH)
         """
         if clear is None:
             clear = self.__in_dev
-        # Insert implementation here
-        if clear:
-            self.clear_cache()
-        return (
-            "Currently, only file hashing is supported, but soon URL hashing will "
-            + "be implemented"
-        )
+        if timeout is None:
+            timeout = socket.getdefaulttimeout()
+        if headers is None:
+            headers = {}
+        if context is None:
+            context = ssl.create_default_context()
+        parts = url_parse.urlparse(url)
+        if parts.netloc == "":
+            if route is None:
+                raise TypeError(
+                    "Relative paths must include the route being used so that an "
+                    + "absolute URL can be constructed"
+                )
+            base_url = url_parse.urljoin(self.domain, route)
+            url = url_parse.urljoin(base_url, url)
+            parts = url_parse.urlparse(url)
+        if parts.scheme != "https":
+            raise ValueError("URL scheme/protocol must be HTTPS")
+        req = url_request.Request(url, data=None, headers=headers, method="GET")
+        try:
+            with url_request.urlopen(
+                req, data=None, timeout=timeout, context=context
+            ) as res:
+                content_type = res.headers["Content-Type"].split(";")[0]
+                if content_type not in [
+                    "text/javascript",
+                    "text/css",
+                    "application/javascript",
+                ]:
+                    raise ValueError(
+                        "Requested resource did not serve a Content-Type of "
+                        + "text/javascript or text/css. Served Content-Type: "
+                        + f"{content_type}. URL: {url}"
+                    )
+                if clear:
+                    self.clear_cache()
+                return self.hash_data(res.read())
+        except url_error.HTTPError as err:
+            print("URL:", url)
+            print("HTTP GET Failed. Status Code:", err.status, ". Reason:", err.reason)
+            raise err
+        except url_error.URLError as err:
+            print("URL:", url)
+            print("Some other urllib error occured. Reason:", err.reason)
+            raise err
+        except TimeoutError as err:
+            print("URL:", url)
+            print(f"Timeout exceeded when GETting {url}")
+            raise err
 
     def hash_data(self, data: bytes | bytearray | memoryview) -> str:
         """Create an SRI hash from some data

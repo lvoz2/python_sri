@@ -6,7 +6,7 @@ import string
 
 from python_sri import SRI
 
-test_domain = "http://127.0.0.1"
+test_domain = "https://lvoz2.github.io/"
 css_sri = "sha256-dO7jYfk102fOhrUJM3ihI4I9y7drqDrJgzyrHgX1ChA="
 js_sri = "sha256-rucZS1gOWuZjatfQlHrI22U0hXgbUKCCyH1W5+tUQh4="
 pwd = pathlib.Path("tests") if pathlib.Path("tests").exists() else pathlib.Path(".")
@@ -93,10 +93,9 @@ def test_no_leading_dots_and_slashes() -> None:
 
 
 def test_http() -> None:
-    in_html = '<link rel="stylesheet" integrity href="js/test.js">'
+    in_html = '<link rel="stylesheet" integrity href="static/css/test.css">'
     test_html = (
-        '<link rel="stylesheet" href="js/test.js" data-sri-error="An unknown error '
-        + 'occured, or no static configuration found">'
+        f'<link rel="stylesheet" integrity="{css_sri}" href="static/css/test.css">'
     )
     sri = SRI(test_domain, hash_alg="sha256")
     out_html = sri.hash_html("/index.html", in_html)
