@@ -40,7 +40,7 @@ Creates the main instance for generating hashes
 
 domain: The domain for the site python_sri is being used for
 
-static: An optional dictionary with a directory for static content to be found from and a url_path that refers to the path in the URL where static content is loaded from
+static: An optional dictionary with a ```directory``` attribute holding a path-like object or string indicating where on the local filesystem static content is loaded from and a ```url_path``` attribute that refers to the path in the URL where static content is loaded from
 
 hash_alg: The hashing algorithm to use, out of 'sha256', 'sha384' and 'sha512'
 
