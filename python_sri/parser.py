@@ -129,9 +129,7 @@ class Element(Tag):
         quote: str = '"',
     ) -> None:
         super().__init__(name)
-        self.__attrs: dict[str, Optional[str]] = (
-            dict(attrs)
-        )
+        self.__attrs: dict[str, Optional[str]] = {} if attrs is None else dict(attrs)
         self.__attrs_changed: set[str] = set()
         # Remove self-closing forward slash at the end, if any,
         # to keep compliance with spec
