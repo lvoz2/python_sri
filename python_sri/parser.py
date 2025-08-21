@@ -130,7 +130,7 @@ class Element(Tag):
     ) -> None:
         super().__init__(name)
         self.__attrs: dict[str, Optional[str]] = (
-            {} if attrs is None else {key: value for key, value in attrs}
+            dict(attrs)
         )
         self.__attrs_changed: set[str] = set()
         # Remove self-closing forward slash at the end, if any,

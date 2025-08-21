@@ -75,15 +75,14 @@ class SRI:
                 raise TypeError("static must either be None or a dictionary")
             if "directory" not in static:
                 raise ValueError("A directory must be given in the static dictionary")
-            elif isinstance(static["directory"], str):
+            if isinstance(static["directory"], str):
                 static["directory"] = pathlib.Path(static["directory"])
             if "url_path" not in static:
                 raise ValueError("A url_path must be given in the static dictionary")
-            else:
-                if not isinstance(static["url_path"], pathlib.Path) and len(
-                    static["url_path"]
-                ) - 1 != static["url_path"].rfind("/"):
-                    static["url_path"] += "/"
+            if not isinstance(static["url_path"], pathlib.Path) and len(
+                static["url_path"]
+            ) - 1 != static["url_path"].rfind("/"):
+                static["url_path"] += "/"
         self.__static_dir: Optional[pathlib.Path] = (
             None
             if static is None
