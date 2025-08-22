@@ -35,7 +35,7 @@ sri.hash_html('/', '<script src="/static/main.js" integrity></script>')
 
 ## Usage
 
-#### python_sri.SRI(*domain*, \*, *static*=None, *hash_alg*='sha384', *in_dev*=False)
+#### python_sri.SRI(*domain*, \*, *static*=None, *hash_alg*='sha384', *in_dev*=False, *\*\*kwargs*)
 Creates the main instance for generating hashes
 
 domain: The domain for the site python_sri is being used for
@@ -45,6 +45,8 @@ static: An optional dictionary with a ```directory``` attribute holding a path-l
 hash_alg: The hashing algorithm to use, out of 'sha256', 'sha384' and 'sha512'
 
 in_dev: Whether this is a development site, which will create new hashes for each request if True
+
+kwargs: Global overrides to the defaults of python_sri.SRI.hash_url's arguments. Useful for giving arguments to that function for adding SRI hashes to HTML
 
 #### python_sri.SRI.domain
 Read only. The domain of the site
@@ -66,9 +68,9 @@ route: The URL path that this function responds to, like "/" or "/index.html"
 clear: Whether to run python_sri.SRI.clear_cache() after finishing. By default, this inherits the value of python_sri.SRI.in_dev
 
 #### python_sri.SRI.hash_html(*route*, *html*, *clear*=None) -> str
-Parses and returns some HTML, adding in a SRI hash where an ```integrity``` attribute is found. If an error occurs, this function will remove the ```integrity``` attribute and put the error message in ```data-sri-error``` instead
+Parses and returns some HTML, adding in a SRI hash where an ```integrity``` attribute is found. If an error occurs, this function will remove the ```integrity``` attribute and put the error message in a new ```data-sri-error``` attribute instead
 
-Will not add SRI hashes to absolute URLs, and is unlikely to ever do
+Will not add SRI hashes to absolute URLs, and is unlikely to ever do so
 
 route: The URL path that the calling function responds to, like "/" or "/index.html"
 
@@ -77,29 +79,35 @@ html: The html document or fragment to add SRI hashes to
 clear: Whether to run python_sri.SRI.clear_cache() after finishing. By default, this inherits the value of python_sri.SRI.in_dev
 
 #### python_sri.SRI.hash_file_path(*path*, *clear*=None) -> str
-Creates a SRI hash for the file at ```path```, else returns an error message **but does not raise an Exception for most failures**.
+Creates a SRI hash for the file at ```path```. Raises exceptions upon failures
 
 path: A path-like object to the file to hash
 
 clear: Whether to run python_sri.SRI.clear_cache() after finishing. By default, this inherits the value of python_sri.SRI.in_dev
 
 #### python_sri.SRI.hash_file_object(*file*, *clear*=None) -> str
-Creates a SRI hash for the file object passed in the ```file``` argument. This file must be created in binary/buffered mode, ie ```open(path, "rb")```. Attempts to do so otherwise will raise exceptions. In Python 3.10, this is just a wrapper around python_sri.SRI.hash_data(). Will return a hash or an error like python_sri.SRI.hash_file_path()
+Creates a SRI hash for the file object passed in the ```file``` argument. This file must be created in binary/buffered mode, ie ```open(path, "rb")```. Attempts to do so otherwise will raise exceptions. In Python 3.10, this is just a wrapper around python_sri.SRI.hash_data(). Will return a hash or raise an exception
 
 file: A file-like object for hashing
 
 clear: Whether to run python_sri.SRI.clear_cache() after finishing. By default, this inherits the value of python_sri.SRI.in_dev
 
-#### python_sri.SRI.hash_url(*url*, \**args*, *clear*=None, \*\**kwargs*) -> str
-**Not Implemented Yet**. Create a SRI hash for the given URL. **Not reccomended for absolute URLs outside of your control**. Errors returned instead of raised
+#### python_sri.SRI.hash_url(*url*, *\**, *timeout*=None, *headers*={}, *context*=None, *route*=None, *clear*=None) -> str
+Creates a SRI hash for the given URL. **Not reccomended for absolute URLs outside of your control**.
 
 url: The URL of the resource to hash
 
-\*args: Various positional arguments to pass to requests.get()
+Keyword Arguments:
+
+timeout: An optional float to set the timeout, which is the time to wait for a response, for the request in seconds. Defaults to the global timeout, which can be set with [```socket.setdefaulttimeout(timeout)```](https://docs.python.org/3/library/socket.html#socket.setdefaulttimeout)
+
+headers: The headers to send with the request. Defaults to ```{}```
+
+context: A ssl.SSLContext or None, which is used to customise the settings for creating a secure connection with SSL/TLS. Defaults to [```ssl.create_default_context()```](https://docs.python.org/3/library/ssl.html#ssl.create_default_context)
+
+route: The route to the page making the request. Mandatory for relative URLs
 
 clear: Whether to run python_sri.SRI.clear_cache() after finishing. By default, this inherits the value of python_sri.SRI.in_dev
-
-\*\*kwargs: Various keyword arguements to pass to requests.get()
 
 #### python_sri.SRI.hash_data(*data*) -> str
 Creates a SRI hash for the data in ```data```

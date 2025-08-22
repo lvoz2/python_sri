@@ -51,7 +51,8 @@ class SRI:
     """
 
     __slots__ = (
-        "domain",
+        "__domain",
+        "__url_overrides",
         "__static_dir",
         "__static_url",
         "__hash_alg",
@@ -68,8 +69,16 @@ class SRI:
         static: Optional[dict[str, str | pathlib.Path]] = None,
         hash_alg: str = "sha384",
         in_dev: bool = False,
+        **kwargs: Optional[float | dict[str, str] | ssl.SSLContext],
     ) -> None:
-        self.domain = domain
+        self.__domain = domain
+        self.__url_overrides: dict[str, dict[str, str] | ssl.SSLContext] = {}
+        if "timeout" in kwargs and isinstance(kwargs["timeout"], int | float):
+            socket.setdefaulttimeout(kwargs["timeout"])
+        if "headers" in kwargs and isinstance(kwargs["headers"], dict):
+            self.__url_overrides["headers"] = kwargs["headers"]
+        if "timeout" in kwargs and isinstance(kwargs["context"], ssl.SSLContext):
+            self.__url_overrides["context"] = kwargs["context"]
         if static is not None:
             if not isinstance(static, dict):
                 raise TypeError("static must either be None or a dictionary")
@@ -120,16 +129,20 @@ class SRI:
 
     def __hash__(self) -> int:
         if self.__static_dir is None:
-            return hash((self.domain, None, self.__hash_alg, self.__in_dev))
+            return hash((self.__domain, None, self.__hash_alg, self.__in_dev))
         return hash(
             (
-                self.domain,
+                self.__domain,
                 self.__static_dir,
                 self.__static_url,
                 self.__hash_alg,
                 self.__in_dev,
             )
         )
+
+    @property
+    def domain(self) -> str:
+        return self.__domain
 
     @property
     def hash_alg(self) -> Literal["sha256", "sha384", "sha512"]:
@@ -187,7 +200,7 @@ class SRI:
         self.__parser.empty()
         self.__parser.feed(html)
         sri_tags: list[parser.Element] = self.__parser.sri_tags
-        base_url = url_parse.urljoin(self.domain, route)
+        base_url = url_parse.urljoin(self.__domain, route)
         for tag in sri_tags:
             integrity: Optional[str] = tag["integrity"]
             if integrity is None:
@@ -396,9 +409,19 @@ class SRI:
         if timeout is None:
             timeout = socket.getdefaulttimeout()
         if headers is None:
-            headers = {}
+            headers = (
+                self.__url_overrides["headers"]
+                if "headers" in self.__url_overrides
+                and isinstance(self.__url_overrides["headers"], dict)
+                else {}
+            )
         if context is None:
-            context = ssl.create_default_context()
+            context = (
+                self.__url_overrides["context"]
+                if "context" in self.__url_overrides
+                and isinstance(self.__url_overrides["context"], ssl.SSLContext)
+                else ssl.create_default_context()
+            )
         parts = url_parse.urlparse(url)
         if parts.netloc == "":
             if route is None:

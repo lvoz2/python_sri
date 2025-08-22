@@ -4,6 +4,7 @@
 
 import pathlib
 import random
+import ssl
 import time
 from typing import Any
 from urllib import request
@@ -88,7 +89,7 @@ def test_full_file_using_http() -> None:
         in_html = f.read()
     with open(pwd / "sri_output" / "http.html", "r", encoding="utf-8") as f:
         test_html = f.read().strip()
-    sri = SRI(test_domain)
+    sri = SRI(test_domain, timeout=5, headers={}, context=ssl.create_default_context())
     out_html = sri.hash_html("/", in_html)
     assert out_html == test_html
 
