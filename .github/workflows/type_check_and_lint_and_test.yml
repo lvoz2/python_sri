@@ -23,7 +23,8 @@ jobs:
         eval "$(pyenv init - bash)"
         pyenv shell ${{ matrix.python-version }}
         python -m pip install --upgrade pip
-        pip install pylint mypy pytest pytest-cov
+        python -m pip install django fastapi flask
+        python -m pip install pylint mypy pytest pytest-cov django-stubs[compatible-mypy]
     - name: Type check and lint code (Mypy + Pylint)
       run: |
         export PYENV_ROOT="$HOME/.pyenv"

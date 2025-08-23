@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "python_sri"
-version = "0.2.0"
+version = "0.3.0"
 authors = [
   { name="lv_oz2", email="lv_oz2@icloud.com" },
 ]
@@ -33,7 +33,14 @@ keywords = ["sri", "subresource integrity"]
 [project.urls]
 Homepage = "https://github.com/lvoz2/python_sri"
 Issues = "https://github.com/lvoz2/python_sri/issues"
-Documentation = "https://github.com/lvoz2/python_sri?tab=readme-ov-file#usage"
+Documentation = "https://github.com/lvoz2/python_sri/wiki"
+
+[project.optional-dependencies]
+development = ["mypy", "pylint", "pytest", "black", "isort"]
+flask = ["flask>=2.0.0"]
+django = ["django>=3.2.9"]
+fastapi = ["fastapi>=0.69.0"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=python_sri --cov-report term-missing:skip-covered"
+

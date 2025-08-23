@@ -15,18 +15,22 @@ Then import, setup and hash!
 ```python
 from python_sri import SRI
 
-# Creating an instance, providing your site's domain name and some config
+# Creating an instance, providing your site's domain name and some optional config
+# sri = SRI('https://example.com')
+# OR
 sri = SRI('https://example.com', static={'directory': 'static', 'url_path': '/static'})
 
 @sri.html_uses_sri('/')
 def index() -> str:
     return '''
-		...
-        <link rel="stylesheet" href="static/main.css" integrity></link>
-		...
-	'''
+        ...
+        <link rel="stylesheet" href="static/main.css" integrity />
+        <script src="static/main.js" integity></script>
+        ...
+    '''
 # -> ...
-#    <link rel="stylesheet" href="static/main.css" integrity="sha384-HASH"></link>
+#    <link rel="stylesheet" href="static/main.css" integrity="sha384-HASH">
+     <script src="static/main.js" integrity="sha384-HASH"></script>
 #    ...
 
 sri.hash_html('/', '<script src="/static/main.js" integrity></script>')

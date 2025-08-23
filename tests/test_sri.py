@@ -11,7 +11,7 @@ from urllib import request
 
 import pytest
 
-from python_sri import SRI
+from python_sri import GenericSRI as SRI
 
 test_domain = "https://lvoz2.github.io/"
 css_sri = "sha256-dO7jYfk102fOhrUJM3ihI4I9y7drqDrJgzyrHgX1ChA="
@@ -273,7 +273,7 @@ def test_bad_ssl() -> None:
         + "failed: Hostname mismatch, certificate is not valid for 'wrong.host."
         + "badssl.com'. (_ssl.c:10"
     )
-    end_test_html = ")\">"
+    end_test_html = ')">'
     out_html = inst.hash_html("/", in_html)
     assert out_html.startswith(test_html) and out_html.endswith(end_test_html)
 

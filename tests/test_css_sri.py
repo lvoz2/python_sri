@@ -4,7 +4,7 @@ import pathlib
 import random
 import string
 
-from python_sri import SRI
+from python_sri import GenericSRI as SRI
 
 test_domain = "https://lvoz2.github.io/"
 css_sri = "sha256-dO7jYfk102fOhrUJM3ihI4I9y7drqDrJgzyrHgX1ChA="
@@ -137,10 +137,12 @@ def test_invalid_integrity() -> None:
 def test_local_404() -> None:
     in_html = '<link rel="stylesheet" integrity href="foo/bar.css">'
     test_html = (
-        '<link rel="stylesheet" href="foo/bar.css" data-sri-error="File not found">'
+        '<link rel="stylesheet" href="foo/bar.css" data-sri-error="File not found at '
+        + "path"
     )
+    end_html = '">'
     out_html = run_sri(pwd / "static", "/", "sha256", in_html, "/index.html")
-    assert out_html == test_html
+    assert out_html.startswith(test_html) and out_html.endswith(end_html)
 
 
 def test_absolute() -> None:

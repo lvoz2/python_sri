@@ -1,4 +1,4 @@
-"""Main class to implement SRI hashing
+"""Base class to implement SRI hashing
 
 The class has many functions to simplify adding SRI hashes, from adding directly to
 given HTML via a decorator all the way to computing a hash given some data.
@@ -8,17 +8,72 @@ import base64
 import functools
 import hashlib
 import io
+import os
 import pathlib
 import re
 import socket
 import ssl
 import sys
-from typing import Any, Callable, Literal, Optional, cast
+from typing import Literal, Optional, ParamSpec, cast
 from urllib import error as url_error
 from urllib import parse as url_parse
 from urllib import request as url_request
 
 from . import parser
+
+Params = ParamSpec("Params")
+
+
+class Headers:
+    """Request headers class that mimics dict, albeit with a few missing items
+
+    A key reasin for this class' existence is for hashability of all the args to
+        SRI.hash_url, needed for @functools.lru_cache to work
+
+    Args:
+    headers: Optional dict of header values. Defaults to the empty dict ({})
+
+    Properties:
+    headers: The headers contained
+
+    Methods:
+    freeze(): Freeze the object, preventing any changes (ie convert from being mutable
+        to being immutable)
+    """
+
+    __slots__ = ("__headers", "__frozen")
+
+    def __init__(self, headers: Optional[dict[str, str]] = None) -> None:
+        if headers is None:
+            self.__headers = {}
+        else:
+            self.__headers = headers
+        self.__frozen = False
+
+    def __getitem__(self, header: str) -> str:
+        return self.__headers[header]
+
+    def __setitem__(self, header: str, value: str) -> None:
+        if self.__frozen:
+            raise KeyError("Trying to set key on a frozen or hashed instance")
+        self.__headers[header] = value
+
+    def __delitem__(self, header: str) -> None:
+        if self.__frozen:
+            raise KeyError("Trying to delete key on a frozen or hashed instance")
+        del self.__headers[header]
+
+    def __hash__(self) -> int:
+        self.__frozen = True
+        return hash(tuple(self.__headers.items()))
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return self.__headers
+
+    def freeze(self) -> dict[str, str]:
+        self.__frozen = True
+        return self.__headers
 
 
 class SRI:
@@ -45,6 +100,8 @@ class SRI:
 
     Properties:
     available_algs: Tuple of available hashing algorithms
+    domain: The domain used by this instance for constructing absolute URLs from
+        relative URLs
     hash_alg: Non editable property returning the selected hashing algorithm.
     in_dev: Non editable property returning the same value as provided by the in_dev
         parameter
@@ -53,8 +110,9 @@ class SRI:
     __slots__ = (
         "__domain",
         "__url_overrides",
-        "__static_dir",
-        "__static_url",
+        "_static_dir",
+        "_static_url",
+        "_use_static",
         "__hash_alg",
         "__in_dev",
         "__sri_ptrn",
@@ -66,7 +124,7 @@ class SRI:
         self,
         domain: str,
         *,
-        static: Optional[dict[str, str | pathlib.Path]] = None,
+        static: Optional[dict[str, str | os.PathLike[str]]] = None,
         hash_alg: str = "sha384",
         in_dev: bool = False,
         **kwargs: Optional[float | dict[str, str] | ssl.SSLContext],
@@ -84,15 +142,22 @@ class SRI:
                 raise TypeError("static must either be None or a dictionary")
             if "directory" not in static:
                 raise ValueError("A directory must be given in the static dictionary")
-            if isinstance(static["directory"], str):
-                static["directory"] = pathlib.Path(static["directory"])
+            if not isinstance(static["directory"], str | os.PathLike):
+                raise TypeError(
+                    "Given directory in static argument is not a path-like object"
+                )
+            static["directory"] = pathlib.Path(static["directory"])
             if "url_path" not in static:
                 raise ValueError("A url_path must be given in the static dictionary")
-            if not isinstance(static["url_path"], pathlib.Path) and len(
+            if not isinstance(static["url_path"], str | os.PathLike):
+                raise TypeError(
+                    "Given url_path in static argument is not a path-like object"
+                )
+            if isinstance(static["url_path"], str) and len(
                 static["url_path"]
             ) - 1 != static["url_path"].rfind("/"):
                 static["url_path"] += "/"
-        self.__static_dir: Optional[pathlib.Path] = (
+        self._static_dir: Optional[pathlib.Path] = (
             None
             if static is None
             else (
@@ -101,15 +166,16 @@ class SRI:
                 else None
             )
         )
-        if self.__static_dir is not None and not self.__static_dir.is_dir():
+        if self._static_dir is not None and not self._static_dir.is_dir():
             raise ValueError(
                 "Provided static directory does not exist or is not a directory"
             )
-        self.__static_url: Optional[str] = (
+        self._static_url: Optional[str] = (
             None
             if static is None
             else (static["url_path"] if isinstance(static["url_path"], str) else None)
         )
+        self._use_static = self._static_dir is not None and self._static_url is not None
         # Normalize string to best fit the three values
         # of sha256, sha384, sha512
         ptrn = re.compile("[\\W_]+")
@@ -128,17 +194,17 @@ class SRI:
         self.__parser = parser.Parser()
 
     def __hash__(self) -> int:
-        if self.__static_dir is None:
-            return hash((self.__domain, None, self.__hash_alg, self.__in_dev))
-        return hash(
-            (
-                self.__domain,
-                self.__static_dir,
-                self.__static_url,
-                self.__hash_alg,
-                self.__in_dev,
+        if self._use_static:
+            return hash(
+                (
+                    self.__domain,
+                    self._static_dir,
+                    self._static_url,
+                    self.__hash_alg,
+                    self.__in_dev,
+                )
             )
-        )
+        return hash((self.__domain, None, self.__hash_alg, self.__in_dev))
 
     @property
     def domain(self) -> str:
@@ -157,39 +223,44 @@ class SRI:
         self.hash_file_object.cache_clear()
         self.hash_url.cache_clear()
 
-    # Functions for creating/inserting SRI hashes
-    # Starts with some decorators for ease, then each step has its own func
-    # Ends with either the hash of a file descriptor or the content of some site
-    # Hashing a URL has not been implemented yet
+    def __relative_to_absolute_url(
+        self, route: Optional[str] = None, src: Optional[str] = None
+    ) -> str:
+        base_url = url_parse.urljoin(self.__domain, route)
+        return url_parse.urljoin(base_url, src)
 
-    def html_uses_sri(
-        self, route: str, clear: Optional[bool] = None
-    ) -> Callable[[Callable[..., str]], Callable[..., str]]:
-        """A decorator to simplify adding SRI hashes to HTML
+    def _absolute_to_fs(self, url: str) -> pathlib.Path:
+        """Converts an absolute URL (https://domain.com/path) to a filesystem path
 
-        @html_uses_sri(route, clear)
-        route: The route that this function is defined for. Used to interpret relative
-            URLs
-        clear: An optional argument, that can override in_dev, controlling whether to
-            clear caches after running.
+        url: The absolute URL to convert
+
+        Returns: A filesystem path (pathlib.Path). No guarantee to whether the path
+            exists
         """
+        if not self._use_static or self._static_url is None or self._static_dir is None:
+            raise ValueError(
+                "No static configuration, so conversions to filesystem paths are "
+                + "disabled"
+            )
+        url_path = url_parse.urlparse(url).path
+        new_path: str = url_path.removeprefix(self._static_url)
+        if new_path == url_path:
+            # Absolute URL did not point to the configured static path
+            raise ValueError("Resource in URL not in configured static directory")
+        return self._static_dir / pathlib.Path(new_path)
 
-        def decorator(func: Callable[..., str]) -> Callable[..., str]:
-            @functools.wraps(func)
-            def wrapper(*args: Any, **kwargs: Any) -> str:
-                nonlocal clear
-                nonlocal route
-                html: str = func(*args, **kwargs)
-                return self.hash_html(route, html, clear)
-
-            return wrapper
-
-        return decorator
-
-    def hash_html(self, route: str, html: str, clear: Optional[bool] = None) -> str:
+    # Functions for creating/inserting SRI hashes
+    # Starts with some decorators for ease (implemented by subclasses), then each step
+    # has its own function
+    # Ends with either the hash of a file descriptor or the content of some site
+    # Subclasses implement all of the following functions starting with a double
+    # underscore without the double underscore in their name, calling these in their
+    # bodies
+    def _hash_html(self, route: str, html: str, clear: Optional[bool] = None) -> str:
         """Parse some HTML, adding in a SRI hash where applicable
 
-        html: The HTML document to operate from
+        route: The URL path of the view calling hash_html
+        html: The HTML document to add SRI hashes to, as a string
         clear: Whether to clear the cache after running. Defaults to the value of in_dev
             Use the in_dev property to control automatic clearing for freshness
 
@@ -200,7 +271,6 @@ class SRI:
         self.__parser.empty()
         self.__parser.feed(html)
         sri_tags: list[parser.Element] = self.__parser.sri_tags
-        base_url = url_parse.urljoin(self.__domain, route)
         for tag in sri_tags:
             integrity: Optional[str] = tag["integrity"]
             if integrity is None:
@@ -256,24 +326,20 @@ class SRI:
                 continue
             # Conversion to absolute URL is required for getting resources via network
             # and to match against a static path to find resources on the filesystem
-            as_absolute_url: str = url_parse.urljoin(base_url, src)
-            if self.__static_dir is not None and self.__static_url is not None:
+            as_absolute_url: str = self.__relative_to_absolute_url(route, src)
+            if self._use_static:
                 # Fetch via filesystem read
-                url_path = url_parse.urlparse(as_absolute_url).path
-                new_path: str = url_path.removeprefix(self.__static_url)
-                if new_path == url_path:
-                    # Absolute URL did not point to the configured static path
+                try:
+                    fs_path: pathlib.Path = self._absolute_to_fs(as_absolute_url)
+                except ValueError as err:
                     del tag["integrity"]
-                    tag["data-sri-error"] = (
-                        "Resource in URL not in configured static directory"
-                    )
+                    tag["data-sri-error"] = str(err)
                     continue
-                fs_path: pathlib.Path = self.__static_dir / pathlib.Path(new_path)
                 try:
                     hash_str = self.hash_file_path(fs_path, False)
-                except ValueError:
+                except ValueError as err:
                     del tag["integrity"]
-                    tag["data-sri-error"] = "File not found"
+                    tag["data-sri-error"] = str(err)
                     continue
             else:
                 # Fetch via HTTP GET request
@@ -316,11 +382,13 @@ class SRI:
 
     @functools.lru_cache(maxsize=64)
     def hash_file_path(
-        self, path: str | pathlib.Path, clear: Optional[bool] = None
+        self,
+        path: str | os.PathLike[str] | bytes | os.PathLike[bytes],
+        clear: Optional[bool] = None,
     ) -> str:
         """Hashes a file, using the file's path
 
-        path: The path to the file to hash (a string or pathlib.Path)
+        path: A path-like object to the file to hash
         clear: Whether to clear the cache after running. Defaults to the value of in_dev
             Use the in_dev property to control automatic clearing for freshness
 
@@ -382,7 +450,7 @@ class SRI:
         url: str,
         *,
         timeout: Optional[float] = None,
-        headers: Optional[dict[str, str]] = None,
+        headers: Optional[Headers] = None,
         context: Optional[ssl.SSLContext] = None,
         route: Optional[str] = None,
         clear: Optional[bool] = None,
@@ -412,8 +480,8 @@ class SRI:
             headers = (
                 self.__url_overrides["headers"]
                 if "headers" in self.__url_overrides
-                and isinstance(self.__url_overrides["headers"], dict)
-                else {}
+                and isinstance(self.__url_overrides["headers"], Headers)
+                else Headers()
             )
         if context is None:
             context = (
@@ -434,7 +502,7 @@ class SRI:
             parts = url_parse.urlparse(url)
         if parts.scheme != "https":
             raise ValueError("URL scheme/protocol must be HTTPS")
-        req = url_request.Request(url, data=None, headers=headers, method="GET")
+        req = url_request.Request(url, data=None, headers=headers.headers, method="GET")
         try:
             with url_request.urlopen(
                 req, data=None, timeout=timeout, context=context
