@@ -127,9 +127,10 @@ Please make sure to update tests as appropriate.
 
 ## Todo
 
-- Add support for Django, Flask and FastAPI directly, so that users don't have to use any workarounds to use this module
-- Multithread getting resources from the local filesystem or over the network
-- Work on documentation, perhaps even use Sphinx or something similar
+- Add support for Django, Flask and FastAPI directly, so that users don't have to use any workarounds to use this module (target release: 0.3.0)
+  - Progress so far: Flask + Django have support but this does not have tests yet. FastAPI still in the works
+- Multithread getting resources from the local filesystem or over the network (target release: 0.4.0)
+- Work on documentation, perhaps even use Sphinx or something similar (target release: 1.0.0)
 
 ## License
 
