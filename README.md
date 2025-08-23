@@ -121,6 +121,12 @@ to discuss what you would like to change.
 
 Please make sure to update tests as appropriate.
 
+## Todo
+
+- Add support for Django, Flask and FastAPI directly, so that users don't have to use any workarounds to use this module
+- Multithread getting resources from the local filesystem or over the network
+- Work on documentation, perhaps even use Sphinx or something similar
+
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
