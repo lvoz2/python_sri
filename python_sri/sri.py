@@ -428,11 +428,11 @@ class SRI:
         """
         if clear is None:
             clear = self.__in_dev
-        if sys.version_info.minor < 11:
+        if sys.version_info.minor < 11:  # pragma: no cover
             # hashlib.file_digest was added in Python 3.11
             with file:
                 res = self.hash_data(file.read())
-        else:
+        else:  # pragma: no cover
             alg = self.__hash_alg
             f_digest = hashlib.file_digest(  # type: ignore[attr-defined, unused-ignore]  # pylint: disable=no-member, line-too-long
                 file, alg

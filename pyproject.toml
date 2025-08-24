@@ -36,7 +36,9 @@ Issues = "https://github.com/lvoz2/python_sri/issues"
 Documentation = "https://github.com/lvoz2/python_sri/wiki"
 
 [project.optional-dependencies]
-development = ["mypy", "pylint", "pytest", "black", "isort"]
+development = ["pylint", "black", "isort"]
+typing = ["mypy", "django-stubs"]
+testing = ["pytest", "flask>=2.0.0", "django>=3.2.9", "fastapi>=0.69.0"]
 flask = ["flask>=2.0.0"]
 django = ["django>=3.2.9"]
 fastapi = ["fastapi>=0.69.0"]

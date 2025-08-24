@@ -6,8 +6,7 @@ import pathlib
 import random
 import ssl
 import time
-from typing import Any
-from urllib import request
+from urllib import request as url_request
 
 import pytest
 
@@ -252,11 +251,17 @@ def test_not_https() -> None:
 
 
 def test_url_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
-    def mock_urlopen(*args: Any, **kwargs: Any) -> None:  # pylint: disable=W0613
+    def mock_urlopen(
+        url: str | url_request.Request,  # pylint: disable=unused-argument
+        data: None = None,  # pylint: disable=unused-argument
+        timeout: float | None = None,  # pylint: disable=unused-argument
+        *,
+        context: ssl.SSLContext | None = None,  # pylint: disable=unused-argument
+    ) -> None:
         time.sleep(0.25)
         raise TimeoutError("timed out")
 
-    monkeypatch.setattr(request, "urlopen", mock_urlopen)
+    monkeypatch.setattr(url_request, "urlopen", mock_urlopen)
     inst = SRI(test_domain)
     in_html = '<link rel="stylesheet" href="/" integrity></link>'
     test_html = '<link rel="stylesheet" href="/" data-sri-error="Timeout exceeded">'
