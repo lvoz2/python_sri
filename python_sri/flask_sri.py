@@ -16,6 +16,7 @@ import flask
 from . import sri
 
 Params = ParamSpec("Params")
+__all__ = ["FlaskSRI"]
 
 
 class FlaskSRI(sri.SRI):

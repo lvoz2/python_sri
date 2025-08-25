@@ -25,6 +25,7 @@ import warnings
 from html.parser import HTMLParser
 from typing import Optional
 
+__all__ = ["Element", "Parser"]
 
 # Base class for not text or Element HTML content
 class Special:
@@ -139,6 +140,8 @@ class Element(Tag):
         self.children: list[Element | Special | str] = []
 
     def __getitem__(self, attr: str) -> Optional[str]:
+        if attr not in self.__attrs:
+            return None
         return self.__attrs[attr]
 
     def __setitem__(self, attr: str, value: str) -> None:
@@ -146,11 +149,17 @@ class Element(Tag):
         self.__attrs_changed.add(attr)
 
     def __delitem__(self, attr: str) -> None:
+        if attr not in self.__attrs:
+            return None
         self.__attrs_changed.add(attr)
         del self.__attrs[attr]
 
     def __contains__(self, attr: str) -> bool:
         return attr in self.__attrs
+
+    @property
+    def quote(self) -> str:
+        return self.__quote
 
     def append(self, child: Element | Special | str, add_to_str: bool = False) -> None:
         if (
@@ -231,12 +240,17 @@ class Parser(HTMLParser):
         if self.__tree[1][0] is None:
             return html
         tag_stack: collections.deque[Element] = collections.deque()
+        finished = False
         for node in self.__flat_tree:
             if isinstance(node, Element):
                 if not node.void:
                     tag_stack.append(node)
             elif isinstance(node, EndTag):
-                tag_stack.pop()
+                if not finished:
+                    tag_stack.pop()
+                else:
+                    continue
+                finished = node.name[1:] == self.__flat_tree[0].name
             html += str(node)
         return html
 
@@ -250,12 +264,23 @@ class Parser(HTMLParser):
             "hr",
             "img",
             "input",
+            "keygen",
             "link",
+            "menuitem",
             "meta",
             "param",
             "source",
             "track",
             "wbr",
+            # From bs4 source, these aren't HTML5 but still treat differently
+            "basefont",
+            "bgsound",
+            "command",
+            "frame",
+            "image",
+            "isindex",
+            "nextid",
+            "spacer",
         ]
 
     # Below this comment are functions for building the HTML tree
@@ -349,10 +374,7 @@ class Parser(HTMLParser):
         if self.__is_void(name.casefold()):
             return
         if name != (start_name := self.__tag_stack[-1].name):
-            raise AssertionError(
-                "End tag does not match up with corresponding start tag, "
-                + f"causing invalid HTML. Start tag: {start_name}, End tag: {name}"
-            )
+            return
         old: Element = self.__tag_stack.pop()
         self.__flat_tree.append(EndTag(name, old))
 

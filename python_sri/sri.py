@@ -22,7 +22,7 @@ from urllib import request as url_request
 from . import parser
 
 Params = ParamSpec("Params")
-
+__all__ = ["Headers", "SRI"]
 
 class Headers:
     """Request headers class that mimics dict, albeit with a few missing items
@@ -295,10 +295,15 @@ class SRI:
                 # In the <link> tag of this message, include the as="val" attribute if
                 # rel="preload"
                 as_attr = "" if tag["as"] is None else tag["as"]
+                quote = '"' if tag.quote == "'" else "'"
                 tag["data-sri-error"] = (
                     "Integrity attribute not supported with "
-                    + f'<link rel="{tag["rel"]}"'
-                    + ((' as="' + as_attr + '"') if tag["rel"] == "preload" else "")
+                    + f'<link rel={quote}{tag["rel"]}{quote}'
+                    + (
+                        (f" as={quote}{as_attr}{quote}")
+                        if tag["rel"] == "preload"
+                        else ""
+                    )
                     + "> values"
                 )
                 continue

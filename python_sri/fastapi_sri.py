@@ -13,6 +13,7 @@ from typing import Optional, ParamSpec
 from . import sri
 
 Params = ParamSpec("Params")
+__all__ = ["FastAPISRI"]
 
 
 class FastAPISRI(sri.SRI):

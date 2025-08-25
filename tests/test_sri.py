@@ -109,9 +109,10 @@ def test_full_file_twice() -> None:
 
 
 def test_bad_html() -> None:
-    in_html = "<html></body>"
-    with pytest.raises(AssertionError):
-        run_sri(pwd / "static", "/", "sha384", in_html, "/")
+    in_html = "<html></body></html>"
+    test_html = "<html></html>"
+    out_html = run_sri(pwd / "static", "/", "sha384", in_html, "/")
+    assert test_html == out_html
 
 
 def test_empty_html() -> None:

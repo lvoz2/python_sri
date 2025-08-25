@@ -184,7 +184,7 @@ def test_unsupported_as_value() -> None:
     in_html = '<link rel="preload" as="font" integrity href="css/test.css">'
     test_html = (
         '<link rel="preload" as="font" href="css/test.css" data-sri-error="Integrity '
-        + 'attribute not supported with <link rel="preload" as="font"> values">'
+        + "attribute not supported with <link rel='preload' as='font'> values\">"
     )
     out_html = run_sri(pwd / "static", "/", "sha256", in_html, "/index.html")
     assert out_html == test_html

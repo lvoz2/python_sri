@@ -11,6 +11,7 @@ from typing import Optional, ParamSpec
 from . import sri
 
 Params = ParamSpec("Params")
+__all__ = ["GenericSRI"]
 
 
 class GenericSRI(sri.SRI):
