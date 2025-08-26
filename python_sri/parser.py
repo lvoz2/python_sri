@@ -21,8 +21,8 @@ Parser: A subclass of html.parser.HTMLParser, which performs the actual parsing 
 from __future__ import annotations
 
 import collections
-from html.parser import HTMLParser
 import re
+from html.parser import HTMLParser
 from typing import Optional
 
 __all__ = ["Element", "Parser"]
@@ -307,18 +307,16 @@ class Parser(HTMLParser):
         if name in ["svg"]:
             self.__in_xml = True
         text: Optional[str] = self.get_starttag_text()
-        if self.__in_xml:
+        if self.__in_xml and text is not None:
             # Attempt to parse a start tag case sensitive
-            # Make attrs mutable
-            attrs = [list(attr_tuple) for attr_tuple in attrs]
             bits = list(
                 re.finditer(self.__bits_regex, text.strip().strip("<>/").strip())
             )
             name = bits[0].group(0)
             if len(bits) >= 2:
-                for i, attr in enumerate(bits[1:]):
-                    key = attr.group(0).split("=")[0]
-                    attrs[i][0] = key
+                for i, attr_in_bits in enumerate(bits[1:]):
+                    key = attr_in_bits.group(0).split("=")[0]
+                    attrs[i] = (key, attrs[i][1])
         # Void elements don't require closing tags
         void: bool = self.__is_void(name)
         tag = Element(name, attrs, void)
