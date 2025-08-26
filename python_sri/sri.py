@@ -13,7 +13,6 @@ import pathlib
 import re
 import socket
 import ssl
-import sys
 from typing import Literal, Optional, ParamSpec, cast
 from urllib import error as url_error
 from urllib import parse as url_parse
@@ -23,6 +22,7 @@ from . import parser
 
 Params = ParamSpec("Params")
 __all__ = ["Headers", "SRI"]
+
 
 class Headers:
     """Request headers class that mimics dict, albeit with a few missing items
@@ -433,18 +433,16 @@ class SRI:
         """
         if clear is None:
             clear = self.__in_dev
-        if sys.version_info.minor < 11:  # pragma: no cover
-            # hashlib.file_digest was added in Python 3.11
-            with file:
-                res = self.hash_data(file.read())
-        else:  # pragma: no cover
+        if hasattr(hashlib, "file_digest"):  # pragma: no cover
             alg = self.__hash_alg
-            f_digest = hashlib.file_digest(  # type: ignore[attr-defined, unused-ignore]  # pylint: disable=no-member, line-too-long
-                file, alg
-            )
+            f_digest = hashlib.file_digest(file, alg)
             digest: bytes = f_digest.digest()
             b64: str = base64.b64encode(digest).decode(encoding="ascii")
             res = f"{self.__hash_alg}-{b64}"
+        else:  # pragma: no cover
+            # hashlib.file_digest was added in Python 3.11
+            with file:
+                res = self.hash_data(file.read())
         if clear:
             self.clear_cache()
         return res

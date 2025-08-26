@@ -78,7 +78,7 @@ def test_full_file_using_static() -> None:
     with open(pwd / "static" / "index.html", "r", encoding="utf-8") as f:
         in_html = f.read()
     with open(pwd / "sri_output" / "index.html", "r", encoding="utf-8") as f:
-        test_html = f.read().strip()
+        test_html = f.read()
     out_html = run_sri(pwd / "static", "/static", "sha384", in_html, "/index.html")
     assert out_html == test_html
 
@@ -87,7 +87,7 @@ def test_full_file_using_http() -> None:
     with open(pwd / "static" / "index.html", "r", encoding="utf-8") as f:
         in_html = f.read()
     with open(pwd / "sri_output" / "http.html", "r", encoding="utf-8") as f:
-        test_html = f.read().strip()
+        test_html = f.read()
     sri = SRI(test_domain, timeout=5, headers={}, context=ssl.create_default_context())
     out_html = sri.hash_html("/", in_html)
     assert out_html == test_html
@@ -97,7 +97,7 @@ def test_full_file_twice() -> None:
     with open(pwd / "static" / "index.html", "r", encoding="utf-8") as f:
         in_html = f.read()
     with open(pwd / "sri_output" / "index.html", "r", encoding="utf-8") as f:
-        test_html = f.read().strip()
+        test_html = f.read()
     sri = SRI(
         test_domain,
         static={"directory": pwd / "static", "url_path": "/static"},
@@ -165,13 +165,10 @@ def test_cache() -> None:
 
 
 def test_multiple_decl() -> None:
-    with pytest.warns(
-        UserWarning, match="Multiple HTML declarations found, overriding"
-    ):
-        in_html = "<!DOCTYPE html><html><!doctype html></html>"
-        test_html = "<!doctype html>\n<html></html>"
-        out_html = run_sri(pwd / "static", "/", "sha384", in_html, "/")
-        assert test_html == out_html
+    in_html = "<!DOCTYPE html>\n<html>\n<!doctype html>\n</html>"
+    test_html = "<!DOCTYPE html>\n<html>\n<!doctype html>\n</html>"
+    out_html = run_sri(pwd / "static", "/", "sha384", in_html, "/")
+    assert test_html == out_html
 
 
 def test_file_path_str() -> None:

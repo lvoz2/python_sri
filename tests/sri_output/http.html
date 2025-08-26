@@ -69,11 +69,11 @@
               <p>There is comment here: <!--This comment should not be displayed--></p>
               <p>There is a comment spanning multiple tags and lines below here.</p>
               <!--<p><a href="#!">This is a text link. But it should not be displayed in a comment</a>.</p>
-              <p><strong>Strong is used to indicate strong importance. But, it should not be displayed in a comment</strong></p>
-              <p><em>This text has added emphasis. But, it should not be displayed in a comment</em></p>-->
+              <p><strong>Strong is used to indicate strong importance. But, it should not be displayed in a comment</strong></p>
+              <p><em>This text has added emphasis. But, it should not be displayed in a comment</em></p>-->
             </div>
-            <footer><p><a href="#top">[Top]</a></p></footer>
-			<![CDATA[<sender>John Smith</sender>]]>
+            <footer><p><a href="#top">[Top]</a></p></footer>
+			<!--[CDATA[<sender>John Smith</sender>]]-->
           </article>
         </section>
         <section id="embedded">
@@ -98,26 +98,24 @@
             <header><h2>Inline SVG</h2></header>
             <div><svg width="100px" height="100px"><circle cx="100" cy="100" r="100" fill="#1fa3ec"></circle></svg></div>
             <footer><p><a href="#top">[Top]</a></p></footer>
-            <div></div>
+            <div>
             <svg viewBox="0 0 100 100">
 				<clipPath id="myClip">
 					<!--
 						Everything outside the circle will be
 						clipped and therefore invisible.
 					-->
-					<circle cx="40" cy="35" r="35"></circle>
+					<circle cx="40" cy="35" r="35" />
 				</clipPath>
 
 				<!-- The original black heart, for reference -->
-				<path
-					id="heart"
-					d="M10,30 A20,20,0,0,1,50,30 A20,20,0,0,1,90,30 Q90,60,50,90 Q10,60,10,30 Z"></path>
+				<path id="heart" d="M10,30 A20,20,0,0,1,50,30 A20,20,0,0,1,90,30 Q90,60,50,90 Q10,60,10,30 Z" />
 
 				<!--
 				Only the portion of the red heart
 				inside the clip circle is visible.
 				-->
-				<use clip-path="url(#myClip)" href="#heart" fill="red"></use>
+				<use clip-path="url(#myClip)" href="#heart" fill="red" />
 			</svg>
           </article>
         </section>

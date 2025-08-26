@@ -21,6 +21,7 @@ from . import sri
 Params = ParamSpec("Params")
 __all__ = ["DjangoSRI"]
 
+
 class DjangoSRI(sri.SRI):
     """Django specific SubResource Integrity hash creation class
 

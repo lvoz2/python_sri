@@ -21,11 +21,12 @@ Parser: A subclass of html.parser.HTMLParser, which performs the actual parsing 
 from __future__ import annotations
 
 import collections
-import warnings
 from html.parser import HTMLParser
+import re
 from typing import Optional
 
 __all__ = ["Element", "Parser"]
+
 
 # Base class for not text or Element HTML content
 class Special:
@@ -85,8 +86,6 @@ class UnknownDecl(Special):
     __slots__ = ()
 
     def __init__(self, content: str) -> None:
-        while content.count("[") > content.count("]"):
-            content += "]"
         super().__init__("![", content, "]")
 
 
@@ -119,29 +118,36 @@ class Element(Tag):
         element) that are children of this Element
     """
 
-    __slots__ = ("__attrs", "__attrs_changed", "__text", "void", "__quote", "children")
+    __slots__ = (
+        "__attrs",
+        "__attrs_changed",
+        "void",
+        "__quote",
+        "__self_closing",
+        "children",
+    )
 
     def __init__(
         self,
         name: str,
-        text: str,
         attrs: Optional[list[tuple[str, Optional[str]]]] = None,
         void: bool = False,
         quote: str = '"',
     ) -> None:
         super().__init__(name)
-        self.__attrs: dict[str, Optional[str]] = {} if attrs is None else dict(attrs)
+        deduped_attrs = {}
+        if attrs is not None:
+            for attr in attrs:
+                if attr[0] not in deduped_attrs:
+                    deduped_attrs[attr[0]] = attr[1]
+        self.__attrs: dict[str, Optional[str]] = deduped_attrs
         self.__attrs_changed: set[str] = set()
-        # Remove self-closing forward slash at the end, if any,
-        # to keep compliance with spec
-        self.__text = text[:-1].rstrip().removesuffix("/").rstrip() + ">"
         self.void = void
         self.__quote = quote
+        self.__self_closing = False
         self.children: list[Element | Special | str] = []
 
     def __getitem__(self, attr: str) -> Optional[str]:
-        if attr not in self.__attrs:
-            return None
         return self.__attrs[attr]
 
     def __setitem__(self, attr: str, value: str) -> None:
@@ -149,8 +155,6 @@ class Element(Tag):
         self.__attrs_changed.add(attr)
 
     def __delitem__(self, attr: str) -> None:
-        if attr not in self.__attrs:
-            return None
         self.__attrs_changed.add(attr)
         del self.__attrs[attr]
 
@@ -160,6 +164,16 @@ class Element(Tag):
     @property
     def quote(self) -> str:
         return self.__quote
+
+    @property
+    def xml_self_closing(self) -> bool:
+        return self.__self_closing
+
+    # This setter only enables self_closing, no matter what, essentially locking that
+    # property to True after an attempt to set it
+    @xml_self_closing.setter
+    def xml_self_closing(self, new: bool) -> None:  # pylint: disable=unused-argument
+        self.__self_closing = True
 
     def append(self, child: Element | Special | str, add_to_str: bool = False) -> None:
         if (
@@ -173,8 +187,6 @@ class Element(Tag):
             self.children.append(child)
 
     def stringify(self) -> str:
-        if len(self.__attrs_changed) == 0 and self.__text != "":
-            return self.__text
         attrs = self.__attrs
         new_attrs: list[str] = []
         for attr, value in attrs.items():
@@ -183,10 +195,9 @@ class Element(Tag):
                 + ("" if value is None else "=" + self.__quote + value + self.__quote)
             )
         start_tag: str = (
-            "<"
-            + self.name
+            ("<" + self.name)
             + ("" if len(new_attrs) == 0 else " " + " ".join(new_attrs))
-            + ">"
+            + ((" /" if self.__self_closing else "") + ">")
         )
         return start_tag
 
@@ -208,25 +219,34 @@ class Parser(HTMLParser):
         an integrity attribute. Used later to compute SRI hashes
     """
 
-    __slots__ = ("__tree", "__tag_stack", "__flat_tree", "sri_tags")
+    __slots__ = ("__tag_stack", "__flat_tree", "sri_tags", "__in_xml")
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=False)
-        self.__tree: tuple[list[Optional[Declaration]], list[Optional[Element]]] = (
-            [None],
-            [None],
-        )
         self.__tag_stack: collections.deque[Element] = collections.deque()
         self.__flat_tree: collections.deque[Element | EndTag | Special | str] = (
             collections.deque()
         )
         self.sri_tags: list[Element] = []
+        self.__in_xml = False
+        # Finds primarily the element/attribute names in a svg tag block. Uses this spec
+        # https://www.w3.org/TR/REC-xml/#NT-Name for definition. Only used inside XML
+        self.__bits_regex = re.compile(
+            "([:A-Z_a-z\xc0-\xd6\xd8-\xf6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c"
+            + "-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd"
+            + "\U00010000-\U000effff][:A-Z_a-z\xc0-\xd6\xd8-\xf6\u00f8-\u02ff\u0370-"
+            + "\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff"
+            + "\uf900-\ufdcf\ufdf0-\ufffd\U00010000-\U000effff-.0-9\xb7\u0300-\u036f"
+            + "\u203f-\u2040]*)(=['\"].+?['\"])?"
+        )
 
-    def empty(self) -> None:
-        self.__tree = ([None], [None])
-        self.__tag_stack.clear()
-        self.__flat_tree.clear()
-        self.sri_tags = []
+    def reset(self) -> None:
+        super().reset()
+        if hasattr(self, "sri_tags"):
+            self.__tag_stack.clear()
+            self.__flat_tree.clear()
+            self.sri_tags = []
+            self.__in_xml = False
 
     def stringify(self) -> str:
         """Converts the HTML tree into a HTML string
@@ -234,23 +254,13 @@ class Parser(HTMLParser):
         returns: HTML, as a string
         """
         html: str = ""
-        if self.__tree[0][0] is not None:
-            html += self.__tree[0][0].stringify()
-            html += "\n"
-        if self.__tree[1][0] is None:
-            return html
         tag_stack: collections.deque[Element] = collections.deque()
-        finished = False
         for node in self.__flat_tree:
             if isinstance(node, Element):
                 if not node.void:
                     tag_stack.append(node)
             elif isinstance(node, EndTag):
-                if not finished:
-                    tag_stack.pop()
-                else:
-                    continue
-                finished = node.name[1:] == self.__flat_tree[0].name
+                tag_stack.pop()
             html += str(node)
         return html
 
@@ -284,67 +294,38 @@ class Parser(HTMLParser):
         ]
 
     # Below this comment are functions for building the HTML tree
-    # SVG is XML, which has tags that are case sensitive. All names are lowercase,
-    # so we need to replace with valid tags if its svg
-    def __convert_svg(self, name: str) -> str:
-        """Converts SVG tag names to camelCase, leaving HTML tags alone"""
-        svg_elems: dict[str, str] = {
-            "animatemotion": "animateMotion",
-            "animatetransform": "animateTransform",
-            "clippath": "clipPath",
-            "feblend": "feBlend",
-            "fecolormatrix": "feColorMatrix",
-            "fecomponenttransfer": "feComponentTransfer",
-            "fecomposite": "feComposite",
-            "feconvolvematrix": "feConvolveMatrix",
-            "fediffuselighting": "feDiffuseLighting",
-            "fedisplacementmap": "feDisplacementMap",
-            "fedistantlight": "feDistantLight",
-            "fedropshadow": "feDropShadow",
-            "feflood": "feFlood",
-            "fefunca": "feFuncA",
-            "fefuncb": "feFuncB",
-            "fefuncg": "feFuncG",
-            "fefuncr": "feFuncR",
-            "fegaussianblur": "feGaussianBlur",
-            "feimage": "feImage",
-            "femerge": "feMerge",
-            "femergenode": "feMergeNode",
-            "femorphology": "feMorphology",
-            "feoffset": "feOffset",
-            "fepointlight": "fePointLight",
-            "fespecularlighting": "feSpecularLighting",
-            "fespotlight": "feSpotlight",
-            "fetile": "feTile",
-            "feturbulence": "feTurbulaence",
-            "foreignobject": "foreignObject",
-            "lineargradient": "linearGradient",
-            "radialgradient": "radialGradient",
-            "textpath": "textPath",
-        }
-        if name not in svg_elems:
-            return name
-        return svg_elems[name]
+    # First we override feed as we only will ever parse full sections
+    def feed(self, data: str) -> None:
+        self.reset()
+        self.rawdata = data  # pylint: disable=attribute-defined-outside-init
+        self.goahead(True)
 
     def __start_tag(
         self, name: str, attrs: list[tuple[str, Optional[str]]], self_closing: bool
     ) -> None:
         """Actual handler for start tags and self closing start tags"""
-        name = self.__convert_svg(name)
+        if name in ["svg"]:
+            self.__in_xml = True
         text: Optional[str] = self.get_starttag_text()
+        if self.__in_xml:
+            # Attempt to parse a start tag case sensitive
+            # Make attrs mutable
+            attrs = [list(attr_tuple) for attr_tuple in attrs]
+            bits = list(
+                re.finditer(self.__bits_regex, text.strip().strip("<>/").strip())
+            )
+            name = bits[0].group(0)
+            if len(bits) >= 2:
+                for i, attr in enumerate(bits[1:]):
+                    key = attr.group(0).split("=")[0]
+                    attrs[i][0] = key
         # Void elements don't require closing tags
         void: bool = self.__is_void(name)
-        tag = Element(name, ("" if text is None else text), attrs, void)
+        tag = Element(name, attrs, void)
+        if self.__in_xml and self_closing:
+            # XML allows self closing tags, so we will set the element to self closing
+            tag.xml_self_closing = True
         self.__flat_tree.append(tag)
-        if self.__tree[1][0] is None:
-            self.__tree[1][0] = tag
-        else:
-            # Add into tree
-            self.__tag_stack[-1].append(tag)
-        if self_closing and not void:
-            # Self closing does not actually exist in standard HTML,
-            # so replace with a pair of start and end tags
-            self.__flat_tree.append(EndTag(name, tag))
         if not (void or self_closing):
             self.__tag_stack.append(tag)
         if tag.name not in ["script", "link"]:
@@ -354,30 +335,56 @@ class Parser(HTMLParser):
                 self.sri_tags.append(tag)
 
     def __add_to_tree(self, data: Special | str, add_to_str: bool = False) -> None:
+        """Adds a non-element to the tree. As non elements will never be edited, some
+        can be added into the last element if that element is a string (ie put a
+        comment into some data that will not be displayed anyway)
+        """
+        if isinstance(data, Declaration):
+            self.__flat_tree.append(data)
+            return
         if len(self.__tag_stack) > 0:
             self.__tag_stack[-1].append(data, add_to_str)
-            if (
-                add_to_str
-                and len(self.__flat_tree) > 0
-                and isinstance(self.__flat_tree[-1], str)
-                and isinstance(data, str)
-            ):
-                self.__flat_tree[-1] += data
-            else:
-                self.__flat_tree.append(data)
+        if (
+            add_to_str
+            and len(self.__flat_tree) > 0
+            and isinstance(self.__flat_tree[-1], str)
+            and isinstance(data, str)
+        ):
+            self.__flat_tree[-1] += data
+        else:
+            self.__flat_tree.append(data)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
         self.__start_tag(tag, attrs, False)
 
     def handle_endtag(self, tag: str) -> None:
-        name: str = self.__convert_svg(tag)
+        if self.__in_xml:
+            # Attempt to parse an end tag case sensitive
+            # Make attrs mutable
+            start_name: str = self.__tag_stack[-1].name
+            if tag == start_name.casefold():
+                name = start_name
+            else:
+                raise ValueError(
+                    "End tag does not match up with start tag inside foreign (XML) "
+                    + "content"
+                )
+        else:
+            name = tag
+        if name.casefold() in ["svg"]:
+            self.__in_xml = False
         if self.__is_void(name.casefold()):
             return
-        if name != (start_name := self.__tag_stack[-1].name):
+        if len(self.__tag_stack) == 0:
+            return
+        if name != self.__tag_stack[-1].name:
             return
         old: Element = self.__tag_stack.pop()
         self.__flat_tree.append(EndTag(name, old))
 
+    # Self closing does not actually exist in standard HTML, so replace with a start
+    # tag. See https://html.spec.whatwg.org/multipage/parsing.html#parse-error-non-void-
+    # html-element-start-tag-with-trailing-solidus for spec
     def handle_startendtag(
         self, tag: str, attrs: list[tuple[str, Optional[str]]]
     ) -> None:
@@ -393,15 +400,49 @@ class Parser(HTMLParser):
         self.__add_to_tree(f"&#{name};", True)
 
     def handle_comment(self, data: str) -> None:
+        # In the source for HTMLParser, certain chars are progressively removed from the
+        # data given upon processing failure
+        for char in "--!":
+            if self.rawdata.endswith(data):
+                raise ValueError(
+                    "Given HTML is malformed and could not be fully processed by "
+                    + "Python's html.parser.HTMLParser class. The unprocessed HTML is "
+                    + f"as follows: {data}"
+                )
+            data += char
+        data = data[:-3]
         self.__add_to_tree(Comment(data))
 
     def handle_decl(self, decl: str) -> None:
-        if self.__tree[0][0] is not None:
-            warnings.warn("Multiple HTML declarations found, overriding")
-        self.__tree[0][0] = Declaration(decl)
+        if self.rawdata.endswith(decl):
+            raise ValueError(
+                "Given HTML is malformed and could not be fully processed by Python's "
+                + "html.parser.HTMLParser class. The unprocessed HTML is as follows: "
+                + decl
+            )
+        self.__add_to_tree(Declaration(decl))
 
     def handle_pi(self, data: str) -> None:
+        if self.rawdata.endswith(data):
+            raise ValueError(
+                "Given HTML is malformed and could not be fully processed by Python's "
+                + "html.parser.HTMLParser class. The unprocessed HTML is as follows: "
+                + data
+            )
         self.__add_to_tree(ProcessingInstruction(data))
 
     def unknown_decl(self, data: str) -> None:
-        self.__add_to_tree(UnknownDecl(data))
+        if self.rawdata.endswith(data):
+            raise ValueError(
+                "Given HTML is malformed and could not be fully processed by Python's "
+                + "html.parser.HTMLParser class. The unprocessed HTML is as follows: "
+                + data
+            )
+        if self.__in_xml and data.startswith("CDATA["):
+            self.__add_to_tree(UnknownDecl(f"{data}]"))
+        elif not self.__in_xml and data.startswith("CDATA["):
+            self.__add_to_tree(Comment(f"[{data}]]"))
+        else:  # pragma: no cover  # This is an impossible situation to get here
+            raise AssertionError(
+                "Somehow this got called without data starting with CDATA["
+            )
