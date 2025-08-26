@@ -4,6 +4,7 @@ The class has many functions to simplify adding SRI hashes, from adding directly
 given HTML via a decorator all the way to computing a hash given some data.
 """
 
+import asyncio
 import base64
 import functools
 import hashlib
@@ -249,6 +250,86 @@ class SRI:
             raise ValueError("Resource in URL not in configured static directory")
         return self._static_dir / pathlib.Path(new_path)
 
+    async def __get_and_hash_absolute_url(
+        self, url: str
+    ) -> tuple[
+        str, str | ValueError | url_error.HTTPError | url_error.URLError | TimeoutError
+    ]:
+        """Using an absolute URL that was bulit from a relative URL, create a SRI
+        hash
+        """
+        try:
+            if self._use_static:
+                # Fetch via filesystem read
+                fs_path: pathlib.Path = self._absolute_to_fs(url)
+                sri_hash = await asyncio.to_thread(self.hash_file_path, fs_path, False)
+                return (url, sri_hash)
+            else:
+                # Fetch via HTTP GET request
+                sri_hash = await asyncio.to_thread(self.hash_url, url)
+                return (url, sri_hash)
+        except (
+            ValueError,
+            url_error.HTTPError,
+            url_error.URLError,
+            TimeoutError,
+        ) as err:
+            return (url, err)
+
+    def __handle_get_errors(
+        self,
+        tag: parser.Element,
+        err: ValueError | url_error.HTTPError | url_error.URLError | TimeoutError,
+    ) -> parser.Element:
+        """Handle errors created when attempting to create SRI hashes. Not async, so
+        separate function
+        """
+        if self._use_static:
+            if isinstance(err, ValueError):
+                self.add_error(tag, str(err))
+                return tag
+            else:
+                raise err
+        else:
+            if isinstance(err, ValueError):
+                if not str(err).startswith(
+                    "Requested resource did not serve a Content-Type of text/"
+                    + "javascript or text/css."
+                ):
+                    raise err
+                self.add_error(
+                    tag,
+                    "URL linked to in href/src attribute had an invalid "
+                    + "Content-Type",
+                )
+                return tag
+            elif isinstance(err, url_error.HTTPError):
+                self.add_error(
+                    tag,
+                    f"HTTP GET Failed. Status Code: {err.status}. Reason: "
+                    + err.reason,
+                )
+                return tag
+            elif isinstance(err, url_error.URLError):
+                self.add_error(
+                    tag, f"Some other urllib error occured. Reason: {err.reason}"
+                )
+                return tag
+            elif isinstance(err, TimeoutError):
+                self.add_error(tag, "Timeout exceeded")
+                return tag
+            else:
+                raise err
+
+    @staticmethod
+    def add_error(tag: parser.Element, text: str) -> None:
+        if "integrity" in tag:
+            del tag["integrity"]
+        if "data-sri-error" in tag and isinstance(tag["data-sri-error"], str):
+            tag["data-sri-error"] += " " + text
+        else:
+            tag["data-sri-error"] = text
+
     # Functions for creating/inserting SRI hashes
     # Starts with some decorators for ease (implemented by subclasses), then each step
     # has its own function
@@ -256,7 +337,9 @@ class SRI:
     # Subclasses implement all of the following functions starting with a double
     # underscore without the double underscore in their name, calling these in their
     # bodies
-    def _hash_html(self, route: str, html: str, clear: Optional[bool] = None) -> str:
+    async def _hash_html(
+        self, route: str, html: str, clear: Optional[bool] = None
+    ) -> str:
         """Parse some HTML, adding in a SRI hash where applicable
 
         route: The URL path of the view calling hash_html
@@ -268,9 +351,9 @@ class SRI:
         """
         if clear is None:
             clear = self.__in_dev
-        self.__parser.empty()
         self.__parser.feed(html)
         sri_tags: list[parser.Element] = self.__parser.sri_tags
+        urls: dict[str, list[parser.Element]] = {}
         for tag in sri_tags:
             integrity: Optional[str] = tag["integrity"]
             if integrity is None:
@@ -284,22 +367,28 @@ class SRI:
             # Check if tag can actually utilise SRI, otherwise remove integrity attr and
             # add data-sri-error attribute with the error message
             if ("href" if tag.name == "link" else "src") not in tag:
-                del tag["integrity"]
-                tag["data-sri-error"] = "No URL to resource provided"
+                self.add_error(tag, "No URL to resource provided")
                 continue
             if tag.name == "link" and (
                 tag["rel"] not in ["stylesheet", "preload"]
                 or (tag["rel"] == "preload" and tag["as"] not in ["script", "style"])
             ):
-                del tag["integrity"]
                 # In the <link> tag of this message, include the as="val" attribute if
                 # rel="preload"
                 as_attr = "" if tag["as"] is None else tag["as"]
-                tag["data-sri-error"] = (
-                    "Integrity attribute not supported with "
-                    + f'<link rel="{tag["rel"]}"'
-                    + ((' as="' + as_attr + '"') if tag["rel"] == "preload" else "")
-                    + "> values"
+                quote = '"' if tag.quote == "'" else "'"
+                self.add_error(
+                    tag,
+                    (
+                        "Integrity attribute not supported with "
+                        + f'<link rel={quote}{tag["rel"]}{quote}'
+                        + (
+                            (f" as={quote}{as_attr}{quote}")
+                            if tag["rel"] == "preload"
+                            else ""
+                        )
+                        + "> values"
+                    ),
                 )
                 continue
             # No checks for URL validity, except that it does not have a domain name
@@ -307,75 +396,35 @@ class SRI:
             # Once the URL is valid, then it should just work here
             src: Optional[str] = tag[attr := "href" if tag.name == "link" else "src"]
             if src is None or len(src.strip()) == 0:
-                del tag["integrity"]
-                tag["data-sri-error"] = f"No URL found in {attr} attribute"
+                self.add_error(tag, f"No URL found in {attr} attribute")
                 continue
             src = src.strip()
-            hash_str: str = ""
             parsed_url: url_parse.ParseResult = url_parse.urlparse(src)
             if parsed_url.netloc != "":
                 # URL is an absolute URL which is currently not supported due to
                 # difficulty proving the domain is owned by the app so that CDN content
                 # is not hashed on page load, which would defeat the purpose of SRI
-                del tag["integrity"]
-                tag["data-sri-error"] = (
+                self.add_error(
+                    tag,
                     "python_sri does not currently support the addition of SRI hashes "
                     + "to absolute URLs. If this resource is owned by the website, use "
-                    + "a relative URL instead for SRI hashes"
+                    + "a relative URL instead for SRI hashes",
                 )
                 continue
             # Conversion to absolute URL is required for getting resources via network
             # and to match against a static path to find resources on the filesystem
             as_absolute_url: str = self.__relative_to_absolute_url(route, src)
-            if self._use_static:
-                # Fetch via filesystem read
-                try:
-                    fs_path: pathlib.Path = self._absolute_to_fs(as_absolute_url)
-                except ValueError as err:
-                    del tag["integrity"]
-                    tag["data-sri-error"] = str(err)
-                    continue
-                try:
-                    hash_str = self.hash_file_path(fs_path, False)
-                except ValueError as err:
-                    del tag["integrity"]
-                    tag["data-sri-error"] = str(err)
-                    continue
-            else:
-                # Fetch via HTTP GET request
-                try:
-                    hash_str = self.hash_url(as_absolute_url)
-                except ValueError as err:
-                    if not str(err).startswith(
-                        "Requested resource did not serve a Content-Type of text/"
-                        + "javascript or text/css."
-                    ):
-                        raise err
-                    del tag["integrity"]
-                    tag["data-sri-error"] = (
-                        "URL linked to in href/src attribute had an invalid "
-                        + "Content-Type"
-                    )
-                    continue
-                except url_error.HTTPError as err:
-                    del tag["integrity"]
-                    tag["data-sri-error"] = (
-                        f"HTTP GET Failed. Status Code: {err.status}. Reason: "
-                        + err.reason
-                    )
-                    continue
-                except url_error.URLError as err:
-                    del tag["integrity"]
-                    tag["data-sri-error"] = (
-                        f"Some other urllib error occured. Reason: {err.reason}"
-                    )
-                    continue
-                except TimeoutError as err:
-                    del tag["integrity"]
-                    tag["data-sri-error"] = "Timeout exceeded"
-                    continue
-            # Should be valid hash in hash_str
-            tag["integrity"] = hash_str
+            if as_absolute_url not in urls:
+                urls[as_absolute_url] = []
+            urls[as_absolute_url].append(tag)
+        awaitables = (self.__get_and_hash_absolute_url(url) for url in urls)
+        results = await asyncio.gather(*awaitables)
+        for result in results:
+            for tag in urls[result[0]]:
+                if isinstance(result[1], str):
+                    tag["integrity"] = result[1]
+                else:
+                    self.__handle_get_errors(tag, result[1])
         if clear:
             self.clear_cache()
         return self.__parser.stringify()

@@ -4,6 +4,7 @@ The class has many functions to simplify adding SRI hashes, from adding directly
 given HTML via a decorator all the way to computing a hash given some data.
 """
 
+import asyncio
 import functools
 from collections.abc import Callable
 from typing import Optional, ParamSpec
@@ -67,7 +68,7 @@ class GenericSRI(sri.SRI):
                 nonlocal clear
                 nonlocal route
                 html: str = func(*args, **kwargs)
-                return self._hash_html(route, html, clear)
+                return asyncio.run(self._hash_html(route, html, clear))
 
             return wrapper
 
@@ -83,4 +84,4 @@ class GenericSRI(sri.SRI):
 
         returns: New HTML with SRI hashes
         """
-        return self._hash_html(route, html, clear)
+        return asyncio.run(self._hash_html(route, html, clear))
