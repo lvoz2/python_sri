@@ -51,13 +51,19 @@ class FastAPISRI(sri.SRI):
         self,
         domain: str,
         *,
+        quote: Optional[str] = None,
         static: Optional[dict[str, str | os.PathLike[str]]] = None,
         hash_alg: str = "sha384",
         in_dev: bool = False,
         **kwargs: Optional[float | dict[str, str] | ssl.SSLContext],
     ) -> None:
         super().__init__(
-            domain, static=static, hash_alg=hash_alg, in_dev=in_dev, **kwargs
+            domain,
+            quote=quote,
+            static=static,
+            hash_alg=hash_alg,
+            in_dev=in_dev,
+            **kwargs,
         )
 
     def html_uses_sri(

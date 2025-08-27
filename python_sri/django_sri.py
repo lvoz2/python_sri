@@ -59,6 +59,7 @@ class DjangoSRI(sri.SRI):
         self,
         domain: str,
         *,
+        quote: Optional[str] = None,
         use_static_override: bool = True,
         hash_alg: str = "sha384",
         in_dev: bool = False,
@@ -79,7 +80,12 @@ class DjangoSRI(sri.SRI):
         if not static:  # According to Pylint, empty dicts are falsey
             static = None
         super().__init__(
-            domain, static=static, hash_alg=hash_alg, in_dev=in_dev, **kwargs
+            domain,
+            quote=quote,
+            static=static,
+            hash_alg=hash_alg,
+            in_dev=in_dev,
+            **kwargs,
         )
         self._use_static = static is not None and use_static_override
 

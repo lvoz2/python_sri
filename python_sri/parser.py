@@ -132,7 +132,7 @@ class Element(Tag):
         name: str,
         attrs: Optional[list[tuple[str, Optional[str]]]] = None,
         void: bool = False,
-        quote: str = '"',
+        quote: Optional[str] = None,
     ) -> None:
         super().__init__(name)
         deduped_attrs = {}
@@ -143,7 +143,7 @@ class Element(Tag):
         self.__attrs: dict[str, Optional[str]] = deduped_attrs
         self.__attrs_changed: set[str] = set()
         self.void = void
-        self.__quote = quote
+        self.__quote = '"' if quote is None or len(quote) == 0 else quote
         self.__self_closing = False
         self.children: list[Element | Special | str] = []
 
@@ -219,10 +219,11 @@ class Parser(HTMLParser):
         an integrity attribute. Used later to compute SRI hashes
     """
 
-    __slots__ = ("__tag_stack", "__flat_tree", "sri_tags", "__in_xml")
+    __slots__ = ("__tag_stack", "__flat_tree", "sri_tags", "__in_xml", "__quote")
 
-    def __init__(self) -> None:
+    def __init__(self, quote: Optional[str] = None) -> None:
         super().__init__(convert_charrefs=False)
+        self.__quote = "" if quote is None else quote
         self.__tag_stack: collections.deque[Element] = collections.deque()
         self.__flat_tree: collections.deque[Element | EndTag | Special | str] = (
             collections.deque()
@@ -237,8 +238,10 @@ class Parser(HTMLParser):
             + "\U00010000-\U000effff][:A-Z_a-z\xc0-\xd6\xd8-\xf6\u00f8-\u02ff\u0370-"
             + "\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff"
             + "\uf900-\ufdcf\ufdf0-\ufffd\U00010000-\U000effff-.0-9\xb7\u0300-\u036f"
-            + "\u203f-\u2040]*)(=['\"].+?['\"])?"
+            + "\u203f-\u2040]*)(=((['\"].+?['\"])|(.+?)))?"
         )
+        # Allowed quote marks surrounding attribute values
+        self.__quotes = ('"', "'")
 
     def reset(self) -> None:
         super().reset()
@@ -315,11 +318,17 @@ class Parser(HTMLParser):
             name = bits[0].group(0)
             if len(bits) >= 2:
                 for i, attr_in_bits in enumerate(bits[1:]):
-                    key = attr_in_bits.group(0).split("=")[0]
+                    key, value = tuple(attr_in_bits.group(0).split("="))
                     attrs[i] = (key, attrs[i][1])
+                    if (
+                        len(self.__quote) == 0
+                        and len(value) > 0
+                        and value[0] in self.__quotes
+                    ):
+                        self.__quote = value[0]
         # Void elements don't require closing tags
         void: bool = self.__is_void(name)
-        tag = Element(name, attrs, void)
+        tag = Element(name, attrs, void, self.__quote)
         if self.__in_xml and self_closing:
             # XML allows self closing tags, so we will set the element to self closing
             tag.xml_self_closing = True

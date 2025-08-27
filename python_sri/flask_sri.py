@@ -48,11 +48,14 @@ class FlaskSRI(sri.SRI):
         parameter
     """
 
+    __slots__ = ("__app",)
+
     def __init__(
         self,
         app: flask.Flask,
         domain: str,
         *,
+        quote: Optional[str] = None,
         hash_alg: str = "sha384",
         in_dev: bool = False,
         **kwargs: Optional[float | dict[str, str] | ssl.SSLContext],
@@ -62,8 +65,14 @@ class FlaskSRI(sri.SRI):
             if app.static_folder is None or app.static_url_path is None
             else {"directory": app.static_folder, "url_path": app.static_url_path}
         )
+        self.__app = app  # pylint: disable=unused-private-member
         super().__init__(
-            domain, static=static, hash_alg=hash_alg, in_dev=in_dev, **kwargs
+            domain,
+            quote=quote,
+            static=static,
+            hash_alg=hash_alg,
+            in_dev=in_dev,
+            **kwargs,
         )
 
     def html_uses_sri(

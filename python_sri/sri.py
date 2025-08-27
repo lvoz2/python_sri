@@ -124,6 +124,7 @@ class SRI:
         self,
         domain: str,
         *,
+        quote: Optional[str] = None,
         static: Optional[dict[str, str | os.PathLike[str]]] = None,
         hash_alg: str = "sha384",
         in_dev: bool = False,
@@ -191,7 +192,7 @@ class SRI:
             "sha(256-[-A-Za-z0-9+/]{43}=?|"
             + "384-[-A-Za-z0-9+/]{64}|512-[-A-Za-z0-9+/]{86}(={2})?)"
         )
-        self.__parser = parser.Parser()
+        self.__parser = parser.Parser(quote)
 
     def __hash__(self) -> int:
         if self._use_static:
@@ -268,7 +269,6 @@ class SRI:
         """
         if clear is None:
             clear = self.__in_dev
-        self.__parser.empty()
         self.__parser.feed(html)
         sri_tags: list[parser.Element] = self.__parser.sri_tags
         for tag in sri_tags:
