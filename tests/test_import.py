@@ -61,7 +61,7 @@ def simulate_installed(installed: list[str]) -> None:
 
 
 @pytest.fixture
-def no_django() -> Generator[None]:
+def no_django() -> Generator[None, None, None]:
     simulate_installed(["fastapi.staticfiles", "flask"])
     yield
     if "python_sri" in sys.modules:
@@ -69,7 +69,7 @@ def no_django() -> Generator[None]:
 
 
 @pytest.fixture
-def no_flask() -> Generator[None]:
+def no_flask() -> Generator[None, None, None]:
     simulate_installed(["django.http", "fastapi.staticfiles"])
     yield
     if "python_sri" in sys.modules:
@@ -77,7 +77,7 @@ def no_flask() -> Generator[None]:
 
 
 @pytest.fixture
-def no_fastapi() -> Generator[None]:
+def no_fastapi() -> Generator[None, None, None]:
     simulate_installed(["flask", "django.http"])
     yield
     if "python_sri" in sys.modules:
@@ -85,7 +85,7 @@ def no_fastapi() -> Generator[None]:
 
 
 @pytest.fixture
-def no_flask_no_fastapi() -> Generator[None]:
+def no_flask_no_fastapi() -> Generator[None, None, None]:
     simulate_installed(["django.http"])
     yield
     if "python_sri" in sys.modules:
@@ -93,7 +93,7 @@ def no_flask_no_fastapi() -> Generator[None]:
 
 
 @pytest.fixture
-def no_flask_no_django() -> Generator[None]:
+def no_flask_no_django() -> Generator[None, None, None]:
     simulate_installed(["fastapi.staticfiles"])
     yield
     if "python_sri" in sys.modules:
@@ -101,7 +101,7 @@ def no_flask_no_django() -> Generator[None]:
 
 
 @pytest.fixture
-def no_django_no_fastapi() -> Generator[None]:
+def no_django_no_fastapi() -> Generator[None, None, None]:
     simulate_installed(["flask"])
     yield
     if "python_sri" in sys.modules:
@@ -109,7 +109,7 @@ def no_django_no_fastapi() -> Generator[None]:
 
 
 @pytest.fixture
-def none_installed() -> Generator[None]:
+def none_installed() -> Generator[None, None, None]:
     simulate_installed([])
     yield
     if "python_sri" in sys.modules:

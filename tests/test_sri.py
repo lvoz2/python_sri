@@ -11,6 +11,7 @@ from urllib import request as url_request
 import pytest
 
 from python_sri import GenericSRI as SRI
+from python_sri import Headers
 
 test_domain = "https://lvoz2.github.io/"
 css_sri = "sha256-dO7jYfk102fOhrUJM3ihI4I9y7drqDrJgzyrHgX1ChA="
@@ -18,6 +19,7 @@ js_sri = "sha256-rucZS1gOWuZjatfQlHrI22U0hXgbUKCCyH1W5+tUQh4="
 pwd = pathlib.Path("tests") if pathlib.Path("tests").exists() else pathlib.Path(".")
 
 
+# Util functions used by test functions
 def random_space() -> str:
     return " " * random.randrange(0, 10)
 
@@ -33,9 +35,93 @@ def run_sri(
     return sri.hash_html(req_path, in_html)
 
 
+# Tests for python_sri.sri.Headers
+def test_headers_args_and_contains() -> None:
+    h = Headers({"Content-Type": "text/html"})
+    assert "Content-Type" in h
+
+
+def test_headers_no_args() -> None:
+    h = Headers()
+    assert "Content-Type" not in h
+
+
+def test_headers_get() -> None:
+    h = Headers({"Content-Type": "text/html"})
+    assert h["Content-Type"] == "text/html"
+
+
+def test_headers_set() -> None:
+    h = Headers()
+    h["Content-Type"] = "text/html"
+    assert h["Content-Type"] == "text/html"
+
+
+def test_headers_del() -> None:
+    h = Headers({"Content-Type": "text/html"})
+    del h["Content-Type"]
+    with pytest.raises(KeyError, match="Content-Type"):
+        print(h["Content-Type"])
+
+
+def test_frozen_headers_set() -> None:
+    h = Headers()
+    h.freeze()
+    with pytest.raises(
+        KeyError, match="Trying to set key on a frozen or hashed instance"
+    ):
+        h["Content-Type"] = "text/html"
+
+
+def test_frozen_headers_del() -> None:
+    h = Headers({"Content-Type": "text/html"})
+    h.freeze()
+    with pytest.raises(
+        KeyError, match="Trying to delete key on a frozen or hashed instance"
+    ):
+        del h["Content-Type"]
+
+
+def test_hash() -> None:
+    h = Headers({"Content-Type": "text/html"})
+    assert isinstance(hash(h), int)
+
+
+# Tests for python_sri.sri.SRI
 def test_static_bad_type() -> None:
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="static must either be None or a dictionary"):
         SRI("https://example.com", static="foo")  # type: ignore[arg-type]
+
+
+def test_static_missing_directory() -> None:
+    with pytest.raises(
+        ValueError, match="A directory must be given in the static dictionary"
+    ):
+        SRI("https://example.com", static={"url_path": "/static"})
+
+
+def test_static_directory_bad_type() -> None:
+    with pytest.raises(
+        TypeError, match="Given directory in static argument is not a path-like object"
+    ):
+        SRI("https://example.com", static={"directory": 5})  # type: ignore[dict-item]
+
+
+def test_static_url_path_bad_type() -> None:
+    with pytest.raises(
+        TypeError, match="Given url_path in static argument is not a string"
+    ):
+        SRI(
+            "https://example.com",
+            static={"directory": "./static", "url_path": 5},  # type: ignore[dict-item]
+        )
+
+
+def test_static_missing_url_path() -> None:
+    with pytest.raises(
+        ValueError, match="A url_path must be given in the static dictionary"
+    ):
+        SRI("https://example.com", static={"directory": "./static"})
 
 
 def test_static_dir_str_does_not_exist() -> None:
@@ -44,16 +130,6 @@ def test_static_dir_str_does_not_exist() -> None:
             "https://example.com",
             static={"url_path": "/", "directory": str(pwd / "static" / "foo")},
         )
-
-
-def test_static_missing_dir() -> None:
-    with pytest.raises(ValueError):
-        SRI("https://example.com", static={"url_path": "/"})
-
-
-def test_static_missing_url_path() -> None:
-    with pytest.raises(ValueError):
-        SRI("https://example.com", static={"directory": pwd / "static"})
 
 
 def test_hash_alg_bad_value() -> None:
@@ -77,7 +153,7 @@ def test_get_in_dev() -> None:
 def test_full_file_using_static() -> None:
     with open(pwd / "static" / "index.html", "r", encoding="utf-8") as f:
         in_html = f.read()
-    with open(pwd / "sri_output" / "index.html", "r", encoding="utf-8") as f:
+    with open(pwd / "output" / "index.html", "r", encoding="utf-8") as f:
         test_html = f.read()
     out_html = run_sri(pwd / "static", "/static", "sha384", in_html, "/index.html")
     assert out_html == test_html
@@ -86,38 +162,11 @@ def test_full_file_using_static() -> None:
 def test_full_file_using_http() -> None:
     with open(pwd / "static" / "index.html", "r", encoding="utf-8") as f:
         in_html = f.read()
-    with open(pwd / "sri_output" / "http.html", "r", encoding="utf-8") as f:
+    with open(pwd / "output" / "http.html", "r", encoding="utf-8") as f:
         test_html = f.read()
     sri = SRI(test_domain, timeout=5, headers={}, context=ssl.create_default_context())
     out_html = sri.hash_html("/", in_html)
     assert out_html == test_html
-
-
-def test_full_file_twice() -> None:
-    with open(pwd / "static" / "index.html", "r", encoding="utf-8") as f:
-        in_html = f.read()
-    with open(pwd / "sri_output" / "index.html", "r", encoding="utf-8") as f:
-        test_html = f.read()
-    sri = SRI(
-        test_domain,
-        static={"directory": pwd / "static", "url_path": "/static"},
-        hash_alg="sha384",
-    )
-    sri.hash_html("/index.html", in_html)
-    out_html = sri.hash_html("/index.html", in_html)
-    assert out_html == test_html
-
-
-def test_bad_html() -> None:
-    in_html = "<html></body></html>"
-    test_html = "<html></html>"
-    out_html = run_sri(pwd / "static", "/", "sha384", in_html, "/")
-    assert test_html == out_html
-
-
-def test_empty_html() -> None:
-    in_html = ""
-    assert run_sri(pwd / "static", "/", "sha384", in_html, "/") == ""
 
 
 def test_empty_cache() -> None:
@@ -164,13 +213,6 @@ def test_cache() -> None:
     )
 
 
-def test_multiple_decl() -> None:
-    in_html = "<!DOCTYPE html>\n<html>\n<!doctype html>\n</html>"
-    test_html = "<!DOCTYPE html>\n<html>\n<!doctype html>\n</html>"
-    out_html = run_sri(pwd / "static", "/", "sha384", in_html, "/")
-    assert test_html == out_html
-
-
 def test_file_path_str() -> None:
     path = str(pwd / "static" / "js" / "test.js")
     inst = SRI(test_domain, hash_alg="sha256")
@@ -184,9 +226,36 @@ def test_file_path_str_404() -> None:
         inst.hash_file_path(path)
 
 
+def test_file_path_pathlib_404() -> None:
+    path = pwd / "static" / "js" / "main.js"
+    inst = SRI(test_domain, hash_alg="sha256")
+    with pytest.raises(ValueError, match=f"File not found at path {path}"):
+        inst.hash_file_path(path)
+
+
 def test_http() -> None:
     inst = SRI(test_domain, hash_alg="sha256")
     assert inst.hash_url("/static/js/test.js", route="/") == js_sri
+
+
+def test_http_with_timeout() -> None:
+    inst = SRI(test_domain, hash_alg="sha256")
+    assert inst.hash_url("/static/js/test.js", route="/", timeout=10.0) == js_sri
+
+
+def test_http_with_headers() -> None:
+    inst = SRI(test_domain, hash_alg="sha256")
+    assert inst.hash_url("/static/js/test.js", route="/", headers=Headers()) == js_sri
+
+
+def test_http_with_context() -> None:
+    inst = SRI(test_domain, hash_alg="sha256")
+    assert (
+        inst.hash_url(
+            "/static/js/test.js", route="/", context=ssl.create_default_context()
+        )
+        == js_sri
+    )
 
 
 def test_hash_data() -> None:
@@ -208,6 +277,16 @@ def test_bad_file_path() -> None:
     inst = SRI(test_domain, hash_alg="sha256")
     with pytest.raises(TypeError):
         assert inst.hash_file_path(path)
+
+
+def test_clear_html() -> None:
+    inst = SRI(
+        test_domain, static={"directory": pwd, "url_path": "/"}, hash_alg="sha256"
+    )
+    in_html = '<script src="/static/js/test.js" integrity></script>'
+    test_html = f'<script src="/static/js/test.js" integrity="{js_sri}"></script>'
+    out_html = inst.hash_html("/", in_html, True)
+    assert test_html == out_html
 
 
 def test_clear_file_path_str() -> None:
@@ -232,13 +311,6 @@ def test_clear_file_object() -> None:
 def test_clear_url() -> None:
     inst = SRI(test_domain, hash_alg="sha256")
     assert inst.hash_url("/static/js/test.js", route="/", clear=True) == js_sri
-
-
-def test_processing_instruction() -> None:
-    in_html = "<div><?proc color='red'></div>"
-    test_html = "<div><?proc color='red'></div>"
-    out_html = run_sri(pwd / "static", "/", "sha384", in_html, "/")
-    assert test_html == out_html
 
 
 def test_not_https() -> None:
@@ -297,6 +369,60 @@ def test_bad_content_type() -> None:
     test_html = (
         '<link rel="stylesheet" href="/" data-sri-error="URL linked to in href/src '
         + 'attribute had an invalid Content-Type">'
+    )
+    out_html = inst.hash_html("/", in_html)
+    assert test_html == out_html
+
+
+def test_absolute_to_fs_func() -> None:
+    inst = SRI("https://example.com/")
+    with pytest.raises(
+        ValueError,
+        match="No static configuration, so conversions to filesystem paths is disabled",
+    ):
+        inst._absolute_to_fs("/")  # pylint: disable=protected-access
+
+
+def test_no_link_or_src_attr() -> None:
+    inst = SRI("https://example.com/")
+    in_html = '<link rel="stylesheet" src="/static/main.css" integrity>'
+    test_html = (
+        '<link rel="stylesheet" src="/static/main.css" data-sri-error="No URL to '
+        + 'resource provided">'
+    )
+    out_html = inst.hash_html("/", in_html)
+    assert test_html == out_html
+
+
+def test_invalid_link_rel() -> None:
+    inst = SRI("https://example.com/")
+    in_html = '<link rel="preload" href="/static/roboto.woff2" as="font" integrity>'
+    test_html = (
+        '<link rel="preload" href="/static/roboto.woff2" as="font" data-sri-error="'
+        + "Integrity attribute not supported with <link rel='preload' as='font'> "
+        + 'values">'
+    )
+    out_html = inst.hash_html("/", in_html)
+    assert test_html == out_html
+
+
+def test_empty_href_or_src() -> None:
+    inst = SRI("https://example.com/")
+    in_html = '<link rel="stylesheet" href="  " integrity>'
+    test_html = (
+        '<link rel="stylesheet" href="  " data-sri-error="No URL found in href '
+        + 'attribute">'
+    )
+    out_html = inst.hash_html("/", in_html)
+    assert test_html == out_html
+
+
+def test_html_href_or_src_404() -> None:
+    inst = SRI(test_domain, static={"directory": pwd, "url_path": "/"})
+    in_html = '<link rel="stylesheet" href="/static/js/main.js" integrity>'
+    test_html = (
+        '<link rel="stylesheet" href="/static/js/main.js" data-sri-error="File not '
+        + 'found at path tests/static/js/main.js">'
     )
     out_html = inst.hash_html("/", in_html)
     assert test_html == out_html

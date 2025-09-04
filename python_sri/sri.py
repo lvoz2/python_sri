@@ -63,6 +63,9 @@ class Headers:
             raise KeyError("Trying to delete key on a frozen or hashed instance")
         del self.__headers[header]
 
+    def __contains__(self, header: str) -> bool:
+        return header in self.__headers
+
     def __hash__(self) -> int:
         self.__frozen = True
         return hash(tuple(self.__headers.items()))
@@ -150,10 +153,8 @@ class SRI:
             static["directory"] = pathlib.Path(static["directory"])
             if "url_path" not in static:
                 raise ValueError("A url_path must be given in the static dictionary")
-            if not isinstance(static["url_path"], str | os.PathLike):
-                raise TypeError(
-                    "Given url_path in static argument is not a path-like object"
-                )
+            if not isinstance(static["url_path"], str):
+                raise TypeError("Given url_path in static argument is not a string")
             if isinstance(static["url_path"], str) and len(
                 static["url_path"]
             ) - 1 != static["url_path"].rfind("/"):
@@ -240,7 +241,7 @@ class SRI:
         """
         if not self._use_static or self._static_url is None or self._static_dir is None:
             raise ValueError(
-                "No static configuration, so conversions to filesystem paths are "
+                "No static configuration, so conversions to filesystem paths is "
                 + "disabled"
             )
         url_path = url_parse.urlparse(url).path
@@ -433,13 +434,13 @@ class SRI:
         """
         if clear is None:
             clear = self.__in_dev
-        if hasattr(hashlib, "file_digest"):  # pragma: no cover
+        if hasattr(hashlib, "file_digest"):
             alg = self.__hash_alg
             f_digest = hashlib.file_digest(file, alg)
             digest: bytes = f_digest.digest()
             b64: str = base64.b64encode(digest).decode(encoding="ascii")
             res = f"{self.__hash_alg}-{b64}"
-        else:  # pragma: no cover
+        else:
             # hashlib.file_digest was added in Python 3.11
             with file:
                 res = self.hash_data(file.read())

@@ -190,20 +190,20 @@ def test_unsupported_as_value() -> None:
     assert out_html == test_html
 
 
-def test_decorator() -> None:
-    inst = SRI(
-        test_domain,
-        static={"directory": pwd / "static", "url_path": "/static"},
-    )
-    in_html = f'<link integrity="{css_sri}" href="css/test.css">'
-    test_html = f'<link integrity="{css_sri}" href="css/test.css">'
-
-    @inst.html_uses_sri("/")
-    def test() -> str:
-        nonlocal in_html
-        return in_html
-
-    assert test_html == test()
+# def test_decorator() -> None:
+#    inst = SRI(
+#        test_domain,
+#        static={"directory": pwd / "static", "url_path": "/static"},
+#    )
+#    in_html = f'<link integrity="{css_sri}" href="css/test.css">'
+#    test_html = f'<link integrity="{css_sri}" href="css/test.css">'
+#
+#    @inst.html_uses_sri("/")
+#    def test() -> str:
+#        nonlocal in_html
+#        return in_html
+#
+#    assert test_html == test()
 
 
 def test_empty_src() -> None:

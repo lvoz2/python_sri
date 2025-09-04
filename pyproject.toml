@@ -44,7 +44,7 @@ django = ["django>=3.2.9"]
 fastapi = ["fastapi>=0.69.0"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=python_sri --cov-report term-missing:skip-covered"
+addopts = "--cov=python_sri --cov-report term-missing:skip-covered --cov-branch"
 
 [tool.mypy]
 disallow_any_explicit = true

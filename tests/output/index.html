@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML5 Test Page</title>
+    <link rel="preload" as="style" href="/static/css/test.css" integrity="sha384-8j1BIU2VrQ6XTQnfwhrWJh4lpAWui+0xAfppTPznvefi3rXkIW3ger6lC2IXJDaW">
+    <link rel="preload" as="script" href="/static/js/test.js" integrity="sha384-BbQzmnC3GdU/XE+t0Fop3F4ogkufAaIK15v8py+NXuLne0jLDTTjX7XdwL8F+XiN">
+    <script src="/static/js/test.js" integrity="sha384-BbQzmnC3GdU/XE+t0Fop3F4ogkufAaIK15v8py+NXuLne0jLDTTjX7XdwL8F+XiN"></script>
+    <script src="./js/test.js" data-sri-error="Resource in URL not in configured static directory"></script>
+    <script src="../static/js/test.js" integrity="sha384-BbQzmnC3GdU/XE+t0Fop3F4ogkufAaIK15v8py+NXuLne0jLDTTjX7XdwL8F+XiN"></script>
+    <script src="static/js/test.js" integrity="sha384-BbQzmnC3GdU/XE+t0Fop3F4ogkufAaIK15v8py+NXuLne0jLDTTjX7XdwL8F+XiN"></script>
+    <script src="/static/js/test.js"></script>
+    <link rel="stylesheet" href="/static/css/test.css" integrity="sha384-8j1BIU2VrQ6XTQnfwhrWJh4lpAWui+0xAfppTPznvefi3rXkIW3ger6lC2IXJDaW">
+    <link rel="stylesheet" href="./css/test.css" data-sri-error="Resource in URL not in configured static directory">
+    <link rel="stylesheet" href="../static/css/test.css" integrity="sha384-8j1BIU2VrQ6XTQnfwhrWJh4lpAWui+0xAfppTPznvefi3rXkIW3ger6lC2IXJDaW">
+    <link rel="stylesheet" href="static/css/test.css" integrity="sha384-8j1BIU2VrQ6XTQnfwhrWJh4lpAWui+0xAfppTPznvefi3rXkIW3ger6lC2IXJDaW">
+    <link rel="stylesheet" href="/static/css/test.css">
+    <link rel="stylesheet" href="/foo/bar.css" data-sri-error="Resource in URL not in configured static directory">
+    <link rel="stylesheet" href="/foo/bar.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" data-sri-error="python_sri does not currently support the addition of SRI hashes to absolute URLs. If this resource is owned by the website, use a relative URL instead for SRI hashes">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css">
+  </head>
+  <body>
+    <div id="top" role="document">
+      <main>
+        <section id="text">
+          <article id="text__code">
+            <div>
+              <p><strong>Inline code:</strong> <code>&lt;div&gt;code&lt;/div&gt;</code></p>
+              <h2>Pre-formatted text</h2>
+              <pre>P R E F O R M A T T E D T E X T
+  ! " # $ % &amp; ' ( ) * + , - . /
+  0 1 2 3 4 5 6 7 8 9 : ; &lt; = &gt; ?
+  @ A B C D E F G H I J K L M N O
+  P Q R S T U V W X Y Z [ \ ] ^ _
+  ` a b c d e f g h i j k l m n o
+  p q r s t u v w x y z { | } ~ </pre>
+            </div>
+            <footer><p><a href="#top">[Top]</a></p></footer>
+          </article>
+          <article id="text__inline">
+            <header><h2>Inline elements</h2></header>
+            <div>
+              <p><a href="#!">This is a text link</a>.</p>
+              <p><strong>Strong is used to indicate strong importance.</strong></p>
+              <p><em>This text has added emphasis.</em></p>
+              <p>The <b>b element</b> is stylistically different text from normal text, without any special importance.</p>
+              <p>The <i>i element</i> is text that is offset from the normal text.</p>
+              <p>The <u>u element</u> is text with an unarticulated, though explicitly rendered, non-textual annotation.</p>
+              <p><del>This text is deleted</del> and <ins>This text is inserted</ins>.</p>
+              <p><s>This text has a strikethrough</s>.</p>
+              <p>Superscript<sup>®</sup>.</p>
+              <p>Subscript for things like H<sub>2</sub>O.</p>
+              <p><small>This small text is small for fine print, etc.</small></p>
+              <p>Abbreviation: <abbr title="HyperText Markup Language">HTML</abbr></p>
+              <p><q cite="https://developer.mozilla.org/en-US/docs/HTML/Element/q">This text is a short inline quotation.</q></p>
+              <p><cite>This is a citation.</cite></p>
+              <p>The <dfn>dfn element</dfn> indicates a definition.</p>
+              <p>The <mark>mark element</mark> indicates a highlight.</p>
+              <p>The <var>variable element</var>, such as <var>x</var> = <var>y</var>.</p>
+              <p>The time element: <time datetime="2013-04-06T12:32+00:00">2 weeks ago</time></p>
+            </div>
+            <footer><p><a href="#top">[Top]</a></p></footer>
+          </article>
+          <article id="text__comments">
+            <header><h2>HTML Comments</h2></header>
+            <div>
+              <p>There is comment here: <!--This comment should not be displayed--></p>
+              <p>There is a comment spanning multiple tags and lines below here.</p>
+              <!--<p><a href="#!">This is a text link. But it should not be displayed in a comment</a>.</p>
+              <p><strong>Strong is used to indicate strong importance. But, it should not be displayed in a comment</strong></p>
+              <p><em>This text has added emphasis. But, it should not be displayed in a comment</em></p>-->
+            </div>
+            <footer><p><a href="#top">[Top]</a></p></footer>
+			<!--[CDATA[<sender>John Smith</sender>]]-->
+          </article>
+        </section>
+        <section id="embedded">
+          <header><h2>Embedded content</h2></header>
+          <article id="embedded__images">
+            <header><h2>Images</h2></header>
+            <div>
+              <h3>Plain <code>&lt;img&gt;</code> element</h3>
+              <p><img src="https://placekitten.com/480/480" alt="Photo of a kitten"></p>
+              <h3><code>&lt;figure&gt;</code> element with <code>&lt;img&gt;</code> element</h3>
+              <figure><img src="https://placekitten.com/420/420" alt="Photo of a kitten"></figure>
+              <h3><code>&lt;figure&gt;</code> element with <code>&#60;img&gt;</code> and <code>&lt;figcaption&gt;</code> elements</h3>
+              <figure>
+                <img src="https://placekitten.com/420/420" alt="Photo of a kitten">
+                <figcaption>Here is a caption for this image.</figcaption>
+              </figure>
+              <h3><code>&lt;figure&gt;</code> element with a <code>&lt;picture&gt;</code> element</h3>
+            </div>
+            <footer><p><a href="#top">[Top]</a></p></footer>
+          </article>
+          <article id="embedded__svg">
+            <header><h2>Inline SVG</h2></header>
+            <div><svg width="100px" height="100px"><circle cx="100" cy="100" r="100" fill="#1fa3ec"></circle></svg></div>
+            <footer><p><a href="#top">[Top]</a></p></footer>
+            <div>
+            <svg viewBox="0 0 100 100">
+				<clipPath id="myClip">
+					<!--
+						Everything outside the circle will be
+						clipped and therefore invisible.
+					-->
+					<circle cx="40" cy="35" r="35" />
+				</clipPath>
+
+				<!-- The original black heart, for reference -->
+				<path id="heart" d="M10,30 A20,20,0,0,1,50,30 A20,20,0,0,1,90,30 Q90,60,50,90 Q10,60,10,30 Z" />
+
+				<!--
+				Only the portion of the red heart
+				inside the clip circle is visible.
+				-->
+				<use clip-path="url(#myClip)" href="#heart" fill="red" />
+			</svg>
+          </div></article>
+        </section>
+      </main>
+      <footer>
+        <p>Made by <a href="http://twitter.com/cbracco">@cbracco</a>. Code on <a href="http://github.com/cbracco/html5-test-page">GitHub</a>.</p>
+      </footer>
+    </div>
+  </body>
+</html>
