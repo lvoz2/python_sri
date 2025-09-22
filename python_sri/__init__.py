@@ -4,14 +4,14 @@ import sys
 from typing import TYPE_CHECKING, Literal, Optional, cast, overload
 
 from .generic_sri import GenericSRI
-from .sri import Headers
+from .headers import FrozenHeaders, Headers, MutableHeaders
 
 if TYPE_CHECKING:
     from .django_sri import DjangoSRI
     from .fastapi_sri import FastAPISRI
     from .flask_sri import FlaskSRI
 
-__all__ = ["GenericSRI", "Headers"]
+__all__ = ["GenericSRI", "FrozenHeaders", "Headers", "MutableHeaders"]
 # This cascading try/except is to detect what framework is being used and change the SRI
 # class exported to match the desired framework
 # Try/except/else: Else block executes if no exceptions are thrown in the try block

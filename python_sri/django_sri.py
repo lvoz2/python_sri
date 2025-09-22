@@ -18,7 +18,7 @@ from django.contrib.staticfiles import finders as static_finders
 
 from . import sri
 
-Params = ParamSpec("Params")
+P = ParamSpec("P")
 __all__ = ["DjangoSRI"]
 
 
@@ -115,8 +115,8 @@ class DjangoSRI(sri.SRI):
         return self._static_dir / pathlib.Path(new_path)
 
     def html_uses_sri(self, clear: Optional[bool] = None) -> Callable[
-        [Callable[Concatenate[dj_http.HttpRequest, Params], dj_http.HttpResponse]],
-        Callable[Concatenate[dj_http.HttpRequest, Params], dj_http.HttpResponse],
+        [Callable[Concatenate[dj_http.HttpRequest, P], dj_http.HttpResponse]],
+        Callable[Concatenate[dj_http.HttpRequest, P], dj_http.HttpResponse],
     ]:
         """A decorator to simplify adding SRI hashes to HTML
 
@@ -128,15 +128,13 @@ class DjangoSRI(sri.SRI):
         """
 
         def decorator(
-            func: Callable[
-                Concatenate[dj_http.HttpRequest, Params], dj_http.HttpResponse
-            ],
-        ) -> Callable[Concatenate[dj_http.HttpRequest, Params], dj_http.HttpResponse]:
+            func: Callable[Concatenate[dj_http.HttpRequest, P], dj_http.HttpResponse],
+        ) -> Callable[Concatenate[dj_http.HttpRequest, P], dj_http.HttpResponse]:
             @functools.wraps(func)
             def wrapper(
                 request: dj_http.HttpRequest,
-                *args: Params.args,
-                **kwargs: Params.kwargs,
+                *args: P.args,
+                **kwargs: P.kwargs,
             ) -> dj_http.HttpResponse:
                 nonlocal clear
                 response: dj_http.HttpResponse = func(request, *args, **kwargs)
@@ -150,9 +148,7 @@ class DjangoSRI(sri.SRI):
             # Arg(HttpRequest, 'request') in place of just HttpRequest, so silenced with
             # cast(type, var)
             return cast(
-                Callable[
-                    Concatenate[dj_http.HttpRequest, Params], dj_http.HttpResponse
-                ],
+                Callable[Concatenate[dj_http.HttpRequest, P], dj_http.HttpResponse],
                 wrapper,
             )
 

@@ -18,65 +18,11 @@ from urllib import error as url_error
 from urllib import parse as url_parse
 from urllib import request as url_request
 
+from . import headers as _headers
 from . import parser
 
 Params = ParamSpec("Params")
-__all__ = ["Headers", "SRI"]
-
-
-class Headers:
-    """Request headers class that mimics dict, albeit with a few missing items
-
-    A key reasin for this class' existence is for hashability of all the args to
-        SRI.hash_url, needed for @functools.lru_cache to work
-
-    Args:
-    headers: Optional dict of header values. Defaults to the empty dict ({})
-
-    Properties:
-    headers: The headers contained
-
-    Methods:
-    freeze(): Freeze the object, preventing any changes (ie convert from being mutable
-        to being immutable)
-    """
-
-    __slots__ = ("__headers", "__frozen")
-
-    def __init__(self, headers: Optional[dict[str, str]] = None) -> None:
-        if headers is None:
-            self.__headers = {}
-        else:
-            self.__headers = headers
-        self.__frozen = False
-
-    def __getitem__(self, header: str) -> str:
-        return self.__headers[header]
-
-    def __setitem__(self, header: str, value: str) -> None:
-        if self.__frozen:
-            raise KeyError("Trying to set key on a frozen or hashed instance")
-        self.__headers[header] = value
-
-    def __delitem__(self, header: str) -> None:
-        if self.__frozen:
-            raise KeyError("Trying to delete key on a frozen or hashed instance")
-        del self.__headers[header]
-
-    def __contains__(self, header: str) -> bool:
-        return header in self.__headers
-
-    def __hash__(self) -> int:
-        self.__frozen = True
-        return hash(tuple(self.__headers.items()))
-
-    @property
-    def headers(self) -> dict[str, str]:
-        return self.__headers
-
-    def freeze(self) -> dict[str, str]:
-        self.__frozen = True
-        return self.__headers
+__all__ = ["SRI"]
 
 
 class SRI:
@@ -133,7 +79,8 @@ class SRI:
         in_dev: bool = False,
         **kwargs: Optional[float | dict[str, str] | ssl.SSLContext],
     ) -> None:
-        self.__domain = domain
+        self.__domain = ""
+        self.domain = domain
         self.__url_overrides: dict[str, dict[str, str] | ssl.SSLContext] = {}
         if "timeout" in kwargs and isinstance(kwargs["timeout"], int | float):
             socket.setdefaulttimeout(kwargs["timeout"])
@@ -211,6 +158,13 @@ class SRI:
     @property
     def domain(self) -> str:
         return self.__domain
+
+    @domain.setter
+    def domain(self, new_domain: str) -> None:
+        if self.__domain == "":
+            self.__domain = new_domain
+        elif self.__domain != new_domain:
+            raise RuntimeError("After setting, domain is immutable")
 
     @property
     def hash_alg(self) -> Literal["sha256", "sha384", "sha512"]:
@@ -454,7 +408,7 @@ class SRI:
         url: str,
         *,
         timeout: Optional[float] = None,
-        headers: Optional[Headers] = None,
+        headers: Optional[_headers.Headers] = None,
         context: Optional[ssl.SSLContext] = None,
         route: Optional[str] = None,
         clear: Optional[bool] = None,
@@ -484,8 +438,8 @@ class SRI:
             headers = (
                 self.__url_overrides["headers"]
                 if "headers" in self.__url_overrides
-                and isinstance(self.__url_overrides["headers"], Headers)
-                else Headers()
+                and isinstance(self.__url_overrides["headers"], _headers.Headers)
+                else _headers.MutableHeaders()
             )
         if context is None:
             context = (
@@ -494,6 +448,8 @@ class SRI:
                 and isinstance(self.__url_overrides["context"], ssl.SSLContext)
                 else ssl.create_default_context()
             )
+        if not isinstance(headers, _headers.MutableHeaders):
+            headers = _headers.MutableHeaders(headers)
         parts = url_parse.urlparse(url)
         if parts.netloc == "":
             if route is None:
@@ -506,7 +462,8 @@ class SRI:
             parts = url_parse.urlparse(url)
         if parts.scheme != "https":
             raise ValueError("URL scheme/protocol must be HTTPS")
-        req = url_request.Request(url, data=None, headers=headers.headers, method="GET")
+        req = url_request.Request(url, data=None, headers=headers, method="GET")
+        print(req.type)
         try:
             with url_request.urlopen(
                 req, data=None, timeout=timeout, context=context
