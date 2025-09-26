@@ -8,14 +8,14 @@ import functools
 import os
 import ssl
 from collections.abc import Callable
-from typing import Optional, ParamSpec
+from typing import Optional, ParamSpec, overload
 from urllib import parse as url_parse
 
 import flask
 
 from . import sri
 
-Params = ParamSpec("Params")
+P = ParamSpec("P")
 __all__ = ["FlaskSRI"]
 
 
@@ -75,11 +75,17 @@ class FlaskSRI(sri.SRI):
             **kwargs,
         )
 
+    @overload
     def html_uses_sri(
-        self, clear_or_func: Optional[bool] | Callable[Params, str]
-    ) -> (
-        Callable[Params, str] | Callable[[Callable[Params, str]], Callable[Params, str]]
-    ):
+        self, clear_or_func: Optional[bool] = None
+    ) -> Callable[[Callable[P, str]], Callable[P, str]]: ...
+
+    @overload
+    def html_uses_sri(self, clear_or_func: Callable[P, str]) -> Callable[P, str]: ...
+
+    def html_uses_sri(
+        self, clear_or_func: Optional[bool] | Callable[P, str] = None
+    ) -> Callable[P, str] | Callable[[Callable[P, str]], Callable[P, str]]:
         """A decorator to simplify adding SRI hashes to HTML
 
         @html_uses_sri
@@ -87,12 +93,12 @@ class FlaskSRI(sri.SRI):
         clear: An optional argument, that can override in_dev, controlling whether to
             clear caches after running.
         """
-        if isinstance(clear_or_func, bool) or clear_or_func is None:
+        if clear_or_func is True or clear_or_func is False or clear_or_func is None:
             clear = clear_or_func
 
-            def decorator(func: Callable[Params, str]) -> Callable[Params, str]:
+            def decorator(func: Callable[P, str]) -> Callable[P, str]:
                 @functools.wraps(func)
-                def wrapper(*args: Params.args, **kwargs: Params.kwargs) -> str:
+                def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
                     nonlocal clear
                     route = url_parse.urlparse(flask.request.url).path
                     html: str = func(*args, **kwargs)
@@ -101,16 +107,21 @@ class FlaskSRI(sri.SRI):
                 return wrapper
 
             return decorator
-        else:
-            func: Callable[Params, str] = clear_or_func
+        elif callable(clear_or_func):
+            func: Callable[P, str] = clear_or_func
 
             @functools.wraps(func)
-            def wrapper(*args: Params.args, **kwargs: Params.kwargs) -> str:
+            def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
                 route = url_parse.urlparse(flask.request.url).path
                 html: str = func(*args, **kwargs)
                 return self._hash_html(route, html, None)
 
             return wrapper
+        else:
+            raise TypeError(
+                f"Invalid argument type given ({type(clear_or_func)}), must be a "
+                + "callable, boolean or None"
+            )
 
     def hash_html(self, html: str, clear: Optional[bool] = None) -> str:
         """Parse some HTML, adding in a SRI hash where applicable

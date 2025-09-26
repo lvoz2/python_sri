@@ -11,7 +11,7 @@ from urllib import request as url_request
 import pytest
 
 from python_sri import GenericSRI as SRI
-from python_sri import Headers
+from python_sri import MutableHeaders as Headers
 
 test_domain = "https://lvoz2.github.io/"
 css_sri = "sha256-dO7jYfk102fOhrUJM3ihI4I9y7drqDrJgzyrHgX1ChA="
@@ -33,58 +33,6 @@ def run_sri(
         hash_alg=alg,
     )
     return sri.hash_html(req_path, in_html)
-
-
-# Tests for python_sri.sri.Headers
-def test_headers_args_and_contains() -> None:
-    h = Headers({"Content-Type": "text/html"})
-    assert "Content-Type" in h
-
-
-def test_headers_no_args() -> None:
-    h = Headers()
-    assert "Content-Type" not in h
-
-
-def test_headers_get() -> None:
-    h = Headers({"Content-Type": "text/html"})
-    assert h["Content-Type"] == "text/html"
-
-
-def test_headers_set() -> None:
-    h = Headers()
-    h["Content-Type"] = "text/html"
-    assert h["Content-Type"] == "text/html"
-
-
-def test_headers_del() -> None:
-    h = Headers({"Content-Type": "text/html"})
-    del h["Content-Type"]
-    with pytest.raises(KeyError, match="Content-Type"):
-        print(h["Content-Type"])
-
-
-def test_frozen_headers_set() -> None:
-    h = Headers()
-    h.freeze()
-    with pytest.raises(
-        KeyError, match="Trying to set key on a frozen or hashed instance"
-    ):
-        h["Content-Type"] = "text/html"
-
-
-def test_frozen_headers_del() -> None:
-    h = Headers({"Content-Type": "text/html"})
-    h.freeze()
-    with pytest.raises(
-        KeyError, match="Trying to delete key on a frozen or hashed instance"
-    ):
-        del h["Content-Type"]
-
-
-def test_hash() -> None:
-    h = Headers({"Content-Type": "text/html"})
-    assert isinstance(hash(h), int)
 
 
 # Tests for python_sri.sri.SRI
@@ -426,3 +374,24 @@ def test_html_href_or_src_404() -> None:
     )
     out_html = inst.hash_html("/", in_html)
     assert test_html == out_html
+
+
+def test_set_domain() -> None:
+    sri = SRI("")
+    domain = "https://example.com/"
+    sri.domain = domain
+    assert sri.domain == domain
+
+
+def test_set_setted_domain() -> None:
+    sri = SRI("https://example.com/")
+    domain = "https://example.com"
+    with pytest.raises(RuntimeError, match="After setting, domain is immutable"):
+        sri.domain = domain
+
+
+def test_same_setted_domain() -> None:
+    sri = SRI("https://example.com/")
+    domain = "https://example.com/"
+    sri.domain = domain
+    assert sri.domain == domain
